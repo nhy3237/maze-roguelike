@@ -1,0 +1,382 @@
+{
+ "_note": "v2b(2026-11-12) CONFIG 추출본. 원본은 reference/v2b.html. 다르면 v2b.html이 맞다.",
+ "tile": 36,
+ "mapGen": {
+  "cols": 48,
+  "rows": 28,
+  "rooms": 13,
+  "roomW": [
+   2,
+   4
+  ],
+  "roomH": [
+   2,
+   3
+  ],
+  "loops": 1,
+  "bend": 1
+ },
+ "minGuardDist": 4,
+ "randomObjects": true,
+ "mapMode": "fixed",
+ "fixedMap": [
+  "#########################",
+  "############..u.T......##",
+  "############.#########.##",
+  "############.#####c....##",
+  "##..u..T.....#####.....##",
+  "##.#########.#####.....##",
+  "##.#########u#######.####",
+  "##.#########.#######T####",
+  "##.######.......####.####",
+  "##.######..u..b....T.####",
+  "##.######.......#########",
+  "##.#######.##############",
+  "#a.#######T##############",
+  "##.#######u##############",
+  "#.....####.##############",
+  "#..S...T.T.##############",
+  "#.....###################",
+  "#########################"
+ ],
+ "zones": [
+  {
+   "name": "시작 방",
+   "r0": 14,
+   "r1": 16,
+   "c0": 1,
+   "c1": 5
+  },
+  {
+   "name": "지름길A",
+   "r0": 15,
+   "r1": 15,
+   "c0": 6,
+   "c1": 10
+  },
+  {
+   "name": "지름길A",
+   "r0": 11,
+   "r1": 14,
+   "c0": 10,
+   "c1": 10
+  },
+  {
+   "name": "우회로A",
+   "r0": 4,
+   "r1": 13,
+   "c0": 1,
+   "c1": 2
+  },
+  {
+   "name": "우회로A",
+   "r0": 4,
+   "r1": 4,
+   "c0": 3,
+   "c1": 12
+  },
+  {
+   "name": "연결 통로",
+   "r0": 5,
+   "r1": 7,
+   "c0": 12,
+   "c1": 12
+  },
+  {
+   "name": "중앙 홀",
+   "r0": 8,
+   "r1": 10,
+   "c0": 9,
+   "c1": 15
+  },
+  {
+   "name": "지름길B",
+   "r0": 9,
+   "r1": 9,
+   "c0": 16,
+   "c1": 20
+  },
+  {
+   "name": "지름길B",
+   "r0": 6,
+   "r1": 8,
+   "c0": 20,
+   "c1": 20
+  },
+  {
+   "name": "우회로B",
+   "r0": 1,
+   "r1": 3,
+   "c0": 12,
+   "c1": 12
+  },
+  {
+   "name": "우회로B",
+   "r0": 1,
+   "r1": 2,
+   "c0": 13,
+   "c1": 22
+  },
+  {
+   "name": "깊은 방",
+   "r0": 3,
+   "r1": 5,
+   "c0": 18,
+   "c1": 22
+  }
+ ],
+ "traps": 0,
+ "trapPlan": {
+  "지름길A": 1,
+  "지름길B": 1
+ },
+ "map": null,
+ "torch": {
+  "radius": 3.2,
+  "offAmbient": 0.7,
+  "warnGlowRadius": 1.5,
+  "eyeRange": 8,
+  "turnSpeed": 5,
+  "fuelMax": 18,
+  "fuelStart": 18,
+  "oilRefill": 10,
+  "oils": 5,
+  "lightDelay": 1,
+  "lightNoise": 5,
+  "exposeTime": 8,
+  "exposeRadius": 40
+ },
+ "sparkleRange": 5,
+ "mouseRange": 1.9,
+ "throwRange": 6.5,
+ "throwConfirm": 2,
+ "throwNoiseRadius": 9,
+ "guard": {
+  "patrol": [
+   [
+    9,
+    10
+   ],
+   [
+    9,
+    12
+   ],
+   [
+    4,
+    12
+   ]
+  ],
+  "creepChance": 0,
+  "creepRadius": 5,
+  "creepRange": 14,
+  "seeRange": 6,
+  "baseSpeed": 1.5,
+  "speedPerRelic": 0.45,
+  "investigateBonus": 0.7,
+  "noiseBase": 1,
+  "noisePerRelic": 1.5,
+  "alertTime": 1.8,
+  "alertSpeed": 1,
+  "lingerTime": 2.5,
+  "loseInterest": 2.5,
+  "stunTrap": 4,
+  "stunShield": 2.5,
+  "trapImmune": 2,
+  "hitRadius": 0.55,
+  "hearRadius": 9,
+  "grabRange": 1.1,
+  "grabTime": 0.55,
+  "nearRange": 4,
+  "dreadRange": 6.5
+ },
+ "playerSpeed": 4.2,
+ "playerRadius": 0.3,
+ "viewRadius": 3.6,
+ "hearRadius": 7,
+ "interactRange": 0.95,
+ "tipRange": 1.8,
+ "invulnTime": 1.5,
+ "collapse": {
+  "enabled": true,
+  "startTime": 130,
+  "perRelicCut": 30,
+  "minAfterPickup": 15,
+  "alerts": [
+   30,
+   10
+  ]
+ },
+ "greed": [
+  1,
+  1,
+  1.25,
+  1.5
+ ],
+ "round": 1,
+ "maxScore": 1500,
+ "goalText": "목표 1500점 — 세 유물을 모두 들고(×1.5) 무너지기 전에 돌아오기",
+ "grades": {
+  "common": {
+   "name": "일반",
+   "mark": 1
+  },
+  "rare": {
+   "name": "희귀",
+   "mark": 2
+  },
+  "epic": {
+   "name": "영웅",
+   "mark": 3
+  },
+  "legendary": {
+   "name": "전설",
+   "mark": 4
+  }
+ },
+ "ranks": [
+  {
+   "min": 1500,
+   "name": "전설의 회수자"
+  },
+  {
+   "min": 1000,
+   "name": "숙련 탐험가"
+  },
+  {
+   "min": 500,
+   "name": "용감한 도굴꾼"
+  },
+  {
+   "min": 1,
+   "name": "조심스러운 견습생"
+  },
+  {
+   "min": 0,
+   "name": "빈손"
+  }
+ ],
+ "relics": {
+  "a": {
+   "id": "small",
+   "name": "금 간 방울",
+   "value": 100,
+   "grade": "common",
+   "shape": "small",
+   "effect": "들고 있으면 울려서 수호자를 부름. 던지면 떨어진 자리에서 울려 미끼가 됨",
+   "rings": {
+    "every": 4.5,
+    "radius": 7,
+    "thrownRings": 4
+   },
+   "lore": "흔들면 낮게 운다. 그 소리를 따라 누군가 들어왔다."
+  },
+  "b": {
+   "id": "seal",
+   "name": "봉인의 조각",
+   "value": 300,
+   "grade": "rare",
+   "shape": "seal",
+   "effect": "함정 피해를 한 번 막고 깨짐 (깨지면 300점도 사라짐)",
+   "protect": true,
+   "lore": "깨지는 순간, 단 한 번 무언가를 막아낸다."
+  },
+  "c": {
+   "id": "rare",
+   "name": "울림의 심장석",
+   "value": 600,
+   "grade": "epic",
+   "shape": "rare",
+   "effect": "점수용",
+   "lore": "가장 깊은 곳에서 아직도 박동처럼 울린다."
+  }
+ },
+ "rounds": {
+  "2": {
+   "maxScore": 2025,
+   "goalText": "목표 2025점 — 더 깊은 유물. 수호자는 빨라지고 붕괴는 일러졌다",
+   "ranks": [
+    {
+     "min": 2025,
+     "name": "전설의 회수자"
+    },
+    {
+     "min": 1350,
+     "name": "숙련 탐험가"
+    },
+    {
+     "min": 700,
+     "name": "용감한 도굴꾼"
+    },
+    {
+     "min": 1,
+     "name": "조심스러운 견습생"
+    },
+    {
+     "min": 0,
+     "name": "빈손"
+    }
+   ],
+   "guard": {
+    "baseSpeed": 1.7
+   },
+   "collapse": {
+    "startTime": 110
+   },
+   "traps": 7,
+   "relics": {
+    "a": {
+     "id": "compass",
+     "name": "녹슨 나침반",
+     "value": 150,
+     "grade": "common",
+     "shape": "small",
+     "pal": "bronze",
+     "effect": "들고 있으면 째깍거려 수호자를 부름. 던지면 떨어진 자리에서 울려 미끼가 됨",
+     "rings": {
+      "every": 4,
+      "radius": 8,
+      "thrownRings": 4
+     },
+     "lore": "바늘은 출구가 아니라 가장 깊은 곳을 가리킨다."
+    },
+    "b": {
+     "id": "sigil",
+     "name": "침묵의 인장",
+     "value": 400,
+     "grade": "epic",
+     "shape": "seal",
+     "pal": "violet",
+     "effect": "함정 피해를 한 번 막고 깨짐 (깨지면 400점도 사라짐)",
+     "protect": true,
+     "lore": "이 인장이 눌린 곳에서는 소리가 죽는다."
+    },
+    "c": {
+     "id": "crown",
+     "name": "무너진 왕관",
+     "value": 800,
+     "grade": "legendary",
+     "shape": "crown",
+     "effect": "점수용",
+     "lore": "왕관이 떨어진 날, 유적도 함께 무너졌다."
+    }
+   }
+  }
+ },
+ "trap": {
+  "warn": 1,
+  "active": 0.7,
+  "idleByLevel": [
+   1,
+   0.9,
+   0.8,
+   0.6
+  ],
+  "restByLevel": [
+   2.2,
+   1.6,
+   1.1,
+   0.7
+  ],
+  "offsetStep": 1.1
+ }
+}

@@ -1,0 +1,2027 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>울리는 전리품 — 프로토타입</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#05090a; --panel:#0c1a1c; --line:#1d3a3e; --text:#cfe6e2; --dim:#7fa09c; --gold:#f2c14e; --warn:#ff9a3c; --danger:#ff4a3d; --teal:#4fd1c5; --frame:#0a1416; --pxfont:'Press Start 2P', ui-monospace, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; display:flex; justify-content:center; }
+  #app { width:min(100vw, 940px); padding:10px; }
+  #hud { display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; background:var(--panel); border:3px solid var(--line); border-radius:0; padding:8px 12px; font-size:13px; margin-bottom:8px; box-shadow:0 0 0 3px var(--frame), inset 2px 2px 0 rgba(255,255,255,.05); }
+  #hud .k { color:var(--dim); margin-right:6px; }
+  #hud .v { font-weight:600; }
+  .pips { display:inline-flex; gap:3px; vertical-align:middle; }
+  .pip { width:12px; height:12px; background:#16292c; box-shadow:inset 0 0 0 2px var(--frame); }
+  .pip.on1 { background:#ffd166; } .pip.on2 { background:var(--warn); } .pip.on3 { background:var(--danger); }
+  #slots { display:flex; gap:10px; margin-bottom:8px; min-height:62px; }   /* 첫 판 전에도 자리를 잡아 두어 시작할 때 화면이 밀리지 않게 */
+  /* 픽셀 인벤토리 슬롯: 둥근 모서리 없이 각진 테두리 + 모서리 노치 */
+  .slot { position:relative; flex:1; display:flex; align-items:center; gap:10px; border:3px solid #2d5156; border-radius:0; padding:7px 10px; background:#101f22; min-height:62px;
+    box-shadow: 0 0 0 3px var(--frame), inset 2px 2px 0 rgba(255,255,255,.07), inset -2px -2px 0 rgba(0,0,0,.45);
+    background-image: linear-gradient(var(--frame) 0 0), linear-gradient(var(--frame) 0 0), linear-gradient(var(--frame) 0 0), linear-gradient(var(--frame) 0 0);
+    background-size: 4px 4px; background-position: 0 0, 100% 0, 0 100%, 100% 100%; background-repeat: no-repeat; }
+  .slot .ico { width:44px; height:44px; flex:none; position:relative; image-rendering:pixelated; }
+  .slot .ico svg { width:100%; height:100%; }
+  .slot .kb { position:absolute; top:-3px; left:-3px; min-width:20px; padding:1px 6px; background:#2d5156; color:#e8f6f4; font:800 12px system-ui; text-align:center; border:2px solid #0a1416; }
+  .slot.carried .kb { background:var(--gold); color:#2a1d04; }
+  .slot .nm { font-size:14px; font-weight:700; color:var(--text); line-height:1.25; }
+  .slot .sub { font-size:12px; color:var(--dim); }
+  .slot.unknown { border-color:#24454a; opacity:.85; }
+  .slot.unknown .ico svg { filter:brightness(0) opacity(.5); }
+  .slot.unknown .ico::after { content:'?'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; color:#6fa3a0; font-family:var(--pxfont); }
+  .slot.seen { border-color:#4a7b80; }
+  .slot.carried { border-color:var(--gold); background:rgba(242,193,78,.12); } .slot.carried .nm { color:var(--gold); }
+  .slot.carried .ico svg { filter:drop-shadow(0 0 6px rgba(242,193,78,.9)); }
+  .slot.dropped { border-color:var(--warn); } .slot.dropped .nm { color:var(--warn); } .slot.dropped .ico svg { opacity:.7; }
+  .slot.broken, .slot.lost { border-color:var(--danger); } .slot.broken .nm, .slot.lost .nm { color:#ff9a90; }
+  .slot.broken .ico svg, .slot.lost .ico svg { filter:grayscale(1) brightness(.6); }
+  .slot.broken .ico::after, .slot.lost .ico::after { content:'\2715'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:34px; color:var(--danger); }
+  .slot.secured { border-color:var(--teal); background:rgba(79,209,197,.12); } .slot.secured .nm { color:var(--teal); }
+  .slot.secured .ico::after { content:'\2713'; position:absolute; right:-4px; bottom:-4px; width:18px; height:18px; background:var(--teal); color:#04261f; font-size:13px; font-weight:900; display:flex; align-items:center; justify-content:center; box-shadow:0 0 0 2px var(--frame); }
+  .hi { display:inline-flex; align-items:center; gap:6px; } .hi b { font-size:12px; font-family:var(--pxfont); letter-spacing:.5px; color:#fff; }
+  i[data-ic], .tipico { display:inline-block; width:22px; height:22px; vertical-align:middle; image-rendering:pixelated; } i[data-ic] svg, .tipico svg { width:100%; height:100%; }
+  /* 픽셀 게이지: 칸칸이 끊어진 막대 */
+  .bar { display:inline-block; width:62px; height:13px; background:#0a1416; box-shadow:0 0 0 2px var(--frame); position:relative; vertical-align:middle; }
+  .bar > i { display:block; height:100%; width:0; background:var(--warn); transition:width .2s linear; }
+  .bar.crit > i { background:var(--danger); }
+  .bar::after { content:''; position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 5px, rgba(0,0,0,.55) 5px 7px); pointer-events:none; }
+  .tipico { margin-right:6px; }
+  .howto { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin:14px 0 10px; }
+  .card { width:118px; padding:10px 6px; border:3px solid var(--line); border-radius:0; background:#101f22; box-shadow:0 0 0 3px var(--frame), inset 2px 2px 0 rgba(255,255,255,.06); }
+  .card i[data-ic] { display:block; width:52px; height:52px; margin:0 auto 6px; }
+  .card b { display:block; font-size:14px; color:var(--text); } .card span { font-size:12px; color:var(--dim); }
+  .keys { display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:center; font-size:13px; color:var(--dim); }
+  .keys span { display:inline-flex; align-items:center; gap:5px; } .keys i[data-ic] { width:24px; height:24px; }
+  .gm { font-size:11px; letter-spacing:1px; margin-left:4px; } .gm.g-common { color:#9fb4b8; } .gm.g-rare { color:#4aa3ff; } .gm.g-epic { color:#b57bff; } .gm.g-legendary { color:#ffcf4a; }
+  .rbtns { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; align-items:center; }
+  .btn[disabled] { opacity:.45; cursor:not-allowed; border-color:var(--line); }
+  #codexScreen { justify-content:flex-start; padding-top:14px; background:#050b0c; }
+  #codexBody { width:min(820px,98%); }
+  .cx-round { margin:10px 0 4px; text-align:left; font-size:13px; color:var(--dim); } .cx-round b { color:var(--text); }
+  .cx-row { display:flex; gap:10px; }
+  .cx-card { flex:1; display:flex; gap:10px; align-items:flex-start; text-align:left; border:3px solid #2d5156; padding:8px 10px; background:#101f22; min-height:92px;
+    box-shadow:0 0 0 3px var(--frame), inset 2px 2px 0 rgba(255,255,255,.07), inset -2px -2px 0 rgba(0,0,0,.45); }
+  .cx-card .ico { width:44px; height:44px; flex:none; position:relative; } .cx-card .ico svg { width:100%; height:100%; }
+  .cx-card .nm { font-size:14px; font-weight:700; } .cx-card .sub { font-size:12px; color:var(--dim); margin-top:2px; } .cx-card .lore { font-size:12px; color:#a9c4c0; margin-top:4px; }
+  .cx-card.common { border-color:#6f8184; } .cx-card.rare { border-color:#3b82d6; } .cx-card.epic { border-color:#8a5bd6; } .cx-card.legendary { border-color:#e0a82a; background:rgba(242,193,78,.08); }
+  .cx-card.unknown { border-color:#24454a; } .cx-card.unknown .ico svg { filter:brightness(0) opacity(.5); }
+  .cx-card.unknown .ico::after, .cx-card.locked .ico::after { content:'?'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:800; color:#6fa3a0; font-family:var(--pxfont); }
+  .cx-card.found .ico svg { filter:grayscale(.8) brightness(.7); }
+  .cx-card.locked { border-style:dashed; border-color:#24454a; opacity:.7; }
+  #logBox { border-radius:0 !important; }
+  #hudCollapse.on { color:var(--warn); } #hudCollapse.crit { color:var(--danger); }
+  #shardState.held { color:var(--gold); } #shardState.broken { color:var(--danger); text-decoration:line-through; }
+  /* 타이틀(메인 메뉴) 화면에서는 위쪽 HUD와 유물 칸을 접어서 아예 보이지 않게 함 */
+  #app.title #hud, #app.title #slots { display:none; }
+  .hudbtns { margin-left:auto; display:flex; gap:8px; }
+  .hudbtns button { background:#13292c; color:var(--text); border:2px solid var(--line); border-radius:0; padding:6px 12px; cursor:pointer; font-size:13px; box-shadow:0 0 0 2px var(--frame); }
+  .hudbtns button:hover { border-color:var(--teal); } .hudbtns button.arm { border-color:var(--danger); color:#ffd0cc; }
+  #stage { position:relative; border:3px solid var(--line); border-radius:0; overflow:hidden; background:#000; box-shadow:0 0 0 3px var(--frame); }
+  canvas { display:block; width:100%; height:auto; image-rendering:auto; }
+  #toast { position:absolute; top:12px; left:50%; transform:translateX(-50%); padding:6px 14px; border-radius:0; border-width:2px; background:rgba(10,20,22,.85); border:1px solid var(--line); font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; white-space:nowrap; }
+  #toast.show { opacity:1; }
+  #toast.bad { border-color:var(--danger); color:#ffd0cc; } #toast.gold { border-color:var(--gold); color:#ffe9b0; }
+  #tip { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); padding:8px 14px; border-radius:0; border-width:2px; background:rgba(8,16,18,.9); border:1px solid #3a5a5e; font-size:14px; display:none; text-align:center; pointer-events:none; max-width:90%; }
+  #tip b { color:var(--gold); } #tip .key { display:inline-block; border:1px solid var(--dim); border-radius:4px; padding:0 6px; margin-right:4px; font-weight:700; }
+  .overlay { position:absolute; inset:0; background:rgba(3,7,8,.92); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; overflow:auto; }
+  .overlay.hidden { display:none; }
+  #relicGuide { margin:10px auto 0; max-width:640px; text-align:left; font-size:12.5px; line-height:1.55; color:var(--text); background:rgba(8,18,20,.62); border:2px solid #2d5156; padding:7px 12px; }
+  #relicGuide b { color:var(--gold); } #relicGuide .rg { color:var(--dim); margin-top:3px; }
+  #startScreen { background:rgba(3,7,8,.52); padding-bottom:120px; justify-content:safe center; }
+  #startScreen h1, #startScreen p { text-shadow:0 2px 8px #000, 0 0 14px #000; }
+  .tsound { position:absolute; top:10px; right:10px; background:#13292c; color:var(--text); border:2px solid var(--line); border-radius:0; padding:6px 12px; cursor:pointer; font-size:13px; box-shadow:0 0 0 2px var(--frame); }
+  .overlay h1 { margin:0 0 6px; font-size:34px; color:var(--gold); letter-spacing:2px; }
+  .overlay h2 { margin:0 0 8px; font-size:28px; }
+  .overlay p { margin:6px 0; color:var(--text); }
+  .goal { font-size:18px; margin:12px 0 16px !important; }
+  .rules { font-size:13px; color:var(--dim); line-height:1.7; text-align:left; max-width:560px; }
+  .btn { margin-top:14px; background:#1b3c40; color:#fff; border:3px solid var(--teal); border-radius:0; padding:9px 22px; font-size:16px; cursor:pointer;
+    box-shadow:0 0 0 3px var(--frame), inset 2px 2px 0 rgba(255,255,255,.12), inset -2px -2px 0 rgba(0,0,0,.4); }
+  .btn:active { box-shadow:0 0 0 3px var(--frame), inset -2px -2px 0 rgba(255,255,255,.12), inset 2px 2px 0 rgba(0,0,0,.4); }
+  .btn.sec { border-color:var(--line); font-size:13px; padding:6px 14px; background:#10272a; }
+  .res-grid { display:grid; grid-template-columns:auto auto; gap:4px 16px; text-align:left; font-size:15px; margin:8px 0; }
+  .res-grid .k { color:var(--dim); }
+  #logBox { width:min(640px, 95%); max-height:170px; overflow:auto; text-align:left; font: 12px/1.5 ui-monospace, Consolas, monospace; background:#081214; border:1px solid var(--line); border-radius:6px; padding:8px; margin-top:10px; white-space:pre-wrap; }
+  #help { color:var(--dim); font-size:12px; margin-top:6px; text-align:center; }
+  .ok { color:var(--teal); } .bad { color:var(--danger); }
+</style>
+</head>
+<body>
+<div id="app" class="title">
+  <div id="hud">
+    <span class="hi" title="소지 유물 개수"><i data-ic="bag"></i><b id="hudCount">0</b></span>
+    <span class="hi" title="지금 탈출하면 확정되는 점수 (소지 2개 ×1.25, 3개 ×1.5)"><i data-ic="small"></i><b id="hudScore">0</b></span>
+    <span class="hi" title="위험 단계"><i data-ic="warn"></i><span class="pips" id="hudPips"></span></span>
+    <span class="hi" title="봉인의 조각: 함정·수호자 피해를 한 번 막고 깨짐"><i data-ic="seal"></i><b id="shardState">—</b></span>
+    <span class="hi" title="횃불 (F) · 남은 기름(초). 켜면 유물이 보이지만 8초 넘게 켜 두면 수호자가 옴. 기름병을 밟으면 +10초"><i data-ic="torch"></i><b id="hudLight">꺼짐</b></span>
+    <span class="hi" title="붕괴까지 남은 시간"><i data-ic="hourglass"></i><span class="bar" id="collapseBar"><i></i></span><b id="hudCollapse">—</b></span>
+    <span class="hi" title="탐험 시간"><i data-ic="clock"></i><b id="hudTime">00:00</b></span>
+    <span class="hi" title="최고 기록"><i data-ic="star"></i><b id="hudBest">0</b></span>
+    <span class="hudbtns"><button id="homeBtn" title="메인 메뉴로">🏠 메인 메뉴</button><button id="codexBtnHud" title="유물 도감 (게임 일시정지)">📖 도감</button><button id="soundBtn" title="M 키">🔊 소리 켬</button></span>
+  </div>
+  <div id="slots"></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="toast"></div>
+    <div id="tip"></div>
+    <div id="startScreen" class="overlay">
+      <button class="tsound" id="soundBtnT" title="M 키">🔊 소리 켬</button>
+      <h1>울리는 전리품</h1>
+      <p style="color:var(--dim);margin-top:0">어두운 유적에서 유물을 들고, 무너지기 전에 입구로 돌아오세요</p>
+      <div class="howto">
+        <div class="card"><i data-ic="torch"></i><b>횃불</b><span><b>F</b> 키로 켜고 끄기</span></div>
+        <div class="card"><i data-ic="rare"></i><b>유물 줍기</b><span>횃불로 한 번 비춘 뒤<br>가까이서 클릭</span></div>
+        <div class="card"><i data-ic="guardian"></i><b>수호자</b><span>발소리·불빛에 깨어남</span></div>
+        <div class="card"><i data-ic="collapse"></i><b>붕괴</b><span>줍는 순간 시작</span></div>
+        <div class="card"><i data-ic="exit"></i><b>입구로 탈출</b><span>클릭해서 확정</span></div>
+      </div>
+      <div class="keys">
+        <span><b>WASD</b> 이동</span>
+        <span><i data-ic="mouseL"></i>줍기 · 탈출</span>
+        <span><i data-ic="mouseR"></i>가장 값싼 유물 던지기</span>
+        <span><b>1·2·3</b> 해당 유물 던지기</span>
+        <span><b>F</b> 횃불 켜고 끄기</span>
+        <span><b>M</b> 소리</span>
+      </div>
+      <div id="relicGuide"></div>
+      <p id="goalLine" style="color:var(--gold);margin:10px 0 0"></p>
+      <div class="rbtns">
+        <button class="btn" id="startBtn">라운드 1 시작 (Enter)</button>
+        <button class="btn" id="startBtn2">라운드 2</button>
+        <button class="btn" id="codexBtn">📖 유물 도감</button>
+      </div>
+
+    </div>
+    <div id="resultScreen" class="overlay hidden">
+      <h2 id="resTitle">탈출 성공</h2>
+      <div class="res-grid">
+        <span class="k">확보 점수</span><span id="resScore">0</span>
+        <span class="k">라운드</span><span id="resRoundTxt">-</span>
+        <span class="k">등급</span><span id="resRank">-</span>
+        <span class="k">최고 기록</span><span id="resBest">-</span>
+        <span class="k">가져온 유물</span><span id="resKept">-</span>
+        <span class="k">잃거나 소비한 유물</span><span id="resLost">-</span>
+        <span class="k">도감</span><span id="resCodex">-</span>
+        <span class="k">탐험 시간</span><span id="resTime">-</span>
+        <span class="k" id="resCauseK">사망 원인</span><span id="resCause">-</span>
+      </div>
+      <div class="rbtns">
+        <button class="btn" id="restartBtn">재시작 (R)</button>
+        <button class="btn" id="nextBtn">라운드 2 도전</button>
+        <button class="btn" id="homeBtn2">🏠 메인 메뉴</button>
+        <button class="btn" id="codexBtn2">📖 유물 도감</button>
+      </div>
+      <div id="logBox"></div>
+      <div><button class="btn sec" id="copyBtn">전체 세션 로그 복사</button> <span id="copyMsg" style="font-size:12px;color:var(--dim)"></span></div>
+    </div>
+    <div id="codexScreen" class="overlay hidden">
+      <h2 style="margin-bottom:2px">유물 도감</h2>
+      <p id="codexSum" style="color:var(--dim);margin:2px 0 6px"></p>
+      <div id="codexBody"></div>
+      <button class="btn" id="codexClose">닫기 (Esc)</button>
+    </div>
+  </div>
+  <div id="help">WASD 이동 · F 횃불 켜고 끄기 · 클릭 줍기/탈출 · 우클릭 던지기(가장 값싼 유물) · 1/2/3 유물 골라 던지기 · M 소리 · R 재시작 · H 메인 메뉴 (결과 화면)</div>
+</div>
+
+<script>
+// ===== LOGIC START =====
+// 조정값은 모두 여기에 모음. 맵은 매 판 새로 생성한다(방 + 복도). 기호: # 벽, . 바닥, S 시작/탈출, T 함정, o 유물 후보 자리(방 가운데)
+const CONFIG = {
+  tile: 36,
+  // 어몽어스식: 작은 방들을 폭 1짜리 긴 복도가 구불구불 잇는다. 넓은 홀이 아니라 "한 줄로 지나가는" 구간이 대부분이 되게
+  mapGen: { cols: 48, rows: 28, rooms: 13, roomW: [2, 4], roomH: [2, 3], loops: 1, bend: 1 },   // bend: 방 사이 복도가 꺾이는 중간점 수(0이면 ㄱ자 하나)
+  mapMode: 'fixed',      // 'fixed' = 아래 고정 맵(①단계), 'gen' = 방+복도 생성 맵(②단계, 아직 검증 전)
+  fixedMap: [
+    "#########################",
+    "############..u.T......##",
+    "############.#########.##",
+    "############.#####c....##",
+    "##..u..T.....#####.....##",
+    "##.#########.#####.....##",
+    "##.#########u#######.####",
+    "##.#########.#######T####",
+    "##.######.......####.####",
+    "##.######..u..b....T.####",
+    "##.######.......#########",
+    "##.#######.##############",
+    "#a.#######T##############",
+    "##.#######u##############",
+    "#.....####.##############",
+    "#..S...T.T.##############",
+    "#.....###################",
+    "#########################",
+  ],   // u = 기름병. 라운드 1은 함정(T)을 지우고 쓴다
+  zones: [
+    { name:'시작 방',            r0:14, r1:16, c0:1,  c1:5 },
+    { name:'지름길A(함정 3)',    r0:15, r1:15, c0:6,  c1:10 },
+    { name:'지름길A(함정 3)',    r0:11, r1:14, c0:10, c1:10 },
+    { name:'우회로A(함정 1)',    r0:4,  r1:13, c0:1,  c1:2 },
+    { name:'우회로A(함정 1)',    r0:4,  r1:4,  c0:3,  c1:12 },
+    { name:'연결 통로',          r0:5,  r1:7,  c0:12, c1:12 },
+    { name:'중앙 홀',            r0:8,  r1:10, c0:9,  c1:15 },
+    { name:'지름길B(함정 2)',    r0:9,  r1:9,  c0:16, c1:20 },
+    { name:'지름길B(함정 2)',    r0:6,  r1:8,  c0:20, c1:20 },
+    { name:'우회로B(함정 1)',    r0:1,  r1:3,  c0:12, c1:12 },
+    { name:'우회로B(함정 1)',    r0:1,  r1:2,  c0:13, c1:22 },
+    { name:'깊은 방',            r0:3,  r1:5,  c0:18, c1:22 },
+  ],
+
+  traps: 0,              // 이 라운드의 함정 개수 (라운드 1은 0 — 어둠과 수호자부터 익히게)
+  map: null,             // 판을 시작할 때 genMap()이 채움
+  // 횃불: 사방을 비춘다(조준 없음). 꺼진 채 시작. F로 켜고 끔 — 끄는 건 즉시, 켜는 데는 lightDelay초 걸리고 소리가 난다.
+  // 켜져 있는 동안 기름이 닳고, 바닥의 기름병(어둠 속에서도 불씨처럼 보임)을 밟으면 찬다. 유물은 횃불 빛에만 보인다.
+  torch: { radius: 3.2, offAmbient: 0.7, warnGlowRadius: 1.5, eyeRange: 8,
+    turnSpeed: 5.0,      // 몸이 마우스 쪽으로 도는 최대 속도(라디안/초) — 던지기 방향용
+    fuelMax: 18, fuelStart: 18, oilRefill: 10, oils: 5,   // 기름(초). 기름병 개수는 맵 생성 때 씀
+    lightDelay: 1.0, lightNoise: 5,                        // 켜는 데 걸리는 시간, '탁' 소리가 닿는 거리(타일)
+    exposeTime: 8, exposeRadius: 40 },                     // 이 시간(초) 넘게 켜 두면 불빛이 멀리서 보여 수호자가 내 자리로 온다(잠들어 있어도 깨어남). 켜 둔 채면 같은 간격으로 반복
+  sparkleRange: 5,       // 횃불이 없어도 이 거리 안(벽에 안 가림)의 유물은 작게 반짝임
+  mouseRange: 1.9,       // 마우스로 줍기·탈출할 수 있는 거리(타일)
+  throwRange: 6.5,       // 유물 던지기 최대 거리(타일)
+  throwConfirm: 2,       // 방어 유물을 키로 던질 때, 이 시간(초) 안에 한 번 더 눌러야 실제로 던져짐
+  throwNoiseRadius: 9,   // 던진 유물이 떨어지며 내는 소리가 닿는 거리(타일)
+  // 수호자: 유물을 처음 줍기 전에는 석상처럼 서 있고, 이후 순찰. 소리가 나면 그쪽으로 이동
+  guard: {
+    patrol: [[9,10],[9,12],[4,12]],           // [행,열] 순찰 지점. 비어 있으면 생성 맵의 '유물 없는 방 가운데'를 먼 순으로 돈다 (첫 지점이 석상 자리)
+    creepChance: 0, creepRadius: 5, creepRange: 14,   // 순찰 지점을 고를 때 이 확률로 플레이어 근처(반경 creepRadius) 칸으로 어슬렁거리며 다가옴. creepRange 밖이면 그냥 순찰
+    seeRange: 6.0,        // 횃불을 켠 채 이 거리 안에 (벽에 안 가린) 수호자가 있으면 들킴
+    baseSpeed: 1.5, speedPerRelic: 0.45, investigateBonus: 0.7,   // 타일/초. 소지 유물이 많을수록 빨라짐
+    noiseBase: 1.0, noisePerRelic: 1.5,      // 움직일 때 발소리가 닿는 거리 = base + perRelic × 소지 개수 (멈추면 0)
+    alertTime: 1.8,       // 경계 단계: 소리를 듣고도 이 시간(초) 동안은 느리게 소리 난 곳으로 다가감 (이때 던진 유물이 유인으로 통함)
+    alertSpeed: 1.0,      // 경계 단계의 이동 속도(타일/초, 소지 유물 수와 무관)
+    lingerTime: 2.5,      // 소리 난 곳에 도착한 뒤 둘러보며 머무는 시간(초)
+    loseInterest: 2.5,    // (이전 값) 소리가 끊긴 뒤 수사를 멈추는 시간(초) — 도착 전에 쓰임
+    stunTrap: 4.0, stunShield: 2.5, trapImmune: 2.0, hitRadius: 0.55, hearRadius: 9,   // trapImmune: 기절이 풀린 뒤 함정에 다시 걸리지 않는 시간(초)
+    grabRange: 1.1, grabTime: 0.55,   // 바로 죽이지 않는다: 이 거리 안에 들어오면 멈춰 서서 grabTime초 동안 손을 뻗고, 그때까지 벗어나지 못하면 잡힘
+    nearRange: 4.0, dreadRange: 6.5,  // nearRange 안의 수호자는 어둠 속에서도 실루엣이 보임. dreadRange 안이면 화면 가장자리가 붉게 뛰고 심장 소리
+  },
+  playerSpeed: 4.2,     // 타일/초
+  playerRadius: 0.3,    // 타일 단위
+  viewRadius: 3.6,      // 시야 반경(타일)
+  hearRadius: 7,        // 경고음이 들리는 거리(타일)
+  interactRange: 0.95,  // E 상호작용 거리(타일)
+  tipRange: 1.8,        // 유물 정보 표시 거리(타일)
+  invulnTime: 1.5,      // 봉인의 조각 발동 후 무적 시간(초)
+  // 붕괴: 첫 유물을 집으면 시작. 유물을 더 집을 때마다 남은 시간이 줄어듦. 0이 되면 매몰(사망)
+  collapse: {
+    enabled: true,
+    startTime: 130,      // 첫 획득 시 주어지는 시간(초) — 맵이 커져서 늘림. 최단 경로 봇은 세 개 다 들고 약 20초면 돌아옴(사람은 길을 모르니 2~3배)
+    perRelicCut: 30,     // 이후 획득마다 깎이는 시간(초)
+    minAfterPickup: 15,  // 획득 직후 최소 보장 시간(초) — 줍자마자 죽는 일 방지
+    alerts: [30, 10],    // 남은 시간 알림(초)
+  },
+  // 욕심 보너스: 들고 나온 유물 개수에 따라 점수에 배율. 입구에서 "지금 나갈까, 더 들어갈까"를 고르게 하는 장치
+  greed: [1, 1, 1.25, 1.5],   // 소지 0·1·2·3개일 때 배율
+  // 목표와 등급 (최대 1000 × 1.5 = 1500점)
+  round: 1, maxScore: 1500,
+  goalText: '목표 1500점 — 세 유물을 모두 들고(×1.5) 무너지기 전에 돌아오기',
+  // 유물 등급: 표시는 ◆ 개수(색약 대비)와 색을 함께 사용
+  grades: { common:{ name:'일반', mark:1 }, rare:{ name:'희귀', mark:2 }, epic:{ name:'영웅', mark:3 }, legendary:{ name:'전설', mark:4 } },
+  ranks: [
+    { min:1500, name:'전설의 회수자' },
+    { min:1000, name:'숙련 탐험가' },
+    { min:500,  name:'용감한 도굴꾼' },
+    { min:1,    name:'조심스러운 견습생' },
+    { min:0,    name:'빈손' },
+  ],
+  relics: {
+    // rings: 들고 있으면 every초마다 울려 radius 안의 수호자를 부른다. 던지면 떨어진 자리에서 thrownRings번 더 울려 미끼가 된다
+    a: { id:'small', name:'금 간 방울',     value:100, grade:'common', shape:'small', effect:'들고 있으면 울려서 수호자를 부름. 던지면 떨어진 자리에서 울려 미끼가 됨', rings:{ every:4.5, radius:7, thrownRings:4 }, lore:'흔들면 낮게 운다. 그 소리를 따라 누군가 들어왔다.' },
+    b: { id:'seal',  name:'봉인의 조각',   value:300, grade:'rare',   shape:'seal',  effect:'함정 피해를 한 번 막고 깨짐 (깨지면 300점도 사라짐)', protect:true, lore:'깨지는 순간, 단 한 번 무언가를 막아낸다.' },
+    c: { id:'rare',  name:'울림의 심장석', value:600, grade:'epic',   shape:'rare',  effect:'점수용', lore:'가장 깊은 곳에서 아직도 박동처럼 울린다.' },
+  },
+  // 라운드 2: 같은 맵, 다른 유물 구성. 수호자는 더 빠르고 붕괴는 더 이르다. (라운드 3 이후는 아직 없음 — 도감에는 잠김 칸으로만 표시)
+  rounds: {
+    2: {
+      maxScore: 2025,
+      goalText: '목표 2025점 — 더 깊은 유물. 수호자는 빨라지고 붕괴는 일러졌다',
+      ranks: [
+        { min:2025, name:'전설의 회수자' },
+        { min:1350, name:'숙련 탐험가' },
+        { min:700,  name:'용감한 도굴꾼' },
+        { min:1,    name:'조심스러운 견습생' },
+        { min:0,    name:'빈손' },
+      ],
+      guard: { baseSpeed: 1.7 },
+      collapse: { startTime: 110 },
+      traps: 7,
+      relics: {
+        a: { id:'compass', name:'녹슨 나침반', value:150, grade:'common',    shape:'small', pal:'bronze', effect:'들고 있으면 째깍거려 수호자를 부름. 던지면 떨어진 자리에서 울려 미끼가 됨', rings:{ every:4, radius:8, thrownRings:4 }, lore:'바늘은 출구가 아니라 가장 깊은 곳을 가리킨다.' },
+        b: { id:'sigil',   name:'침묵의 인장', value:400, grade:'epic',      shape:'seal',  pal:'violet', effect:'함정 피해를 한 번 막고 깨짐 (깨지면 400점도 사라짐)', protect:true, lore:'이 인장이 눌린 곳에서는 소리가 죽는다.' },
+        c: { id:'crown',   name:'무너진 왕관', value:800, grade:'legendary', shape:'crown', effect:'점수용', lore:'왕관이 떨어진 날, 유적도 함께 무너졌다.' },
+      },
+    },
+  },
+  // 함정: 대기 → 경고 → 작동 → 휴식 반복. 위험 단계(누적 획득 수)에 따라 휴식/대기가 짧아짐.
+  trap: {
+    warn: 1.0,                       // 경고 시간은 단계와 무관하게 고정 (피할 시간 보장)
+    active: 0.7,
+    idleByLevel: [1.0, 0.9, 0.8, 0.6],
+    restByLevel: [2.2, 1.6, 1.1, 0.7],
+    offsetStep: 1.1,                 // 함정마다 위상 차이(초)
+  },
+};
+
+const TRAP_NEXT = { idle:'warn', warn:'active', active:'rest', rest:'idle' };
+
+function maxLevel(cfg) { return cfg.trap.restByLevel.length - 1; }
+
+function seededRng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const josa = (w, a, b) => ((w.charCodeAt(w.length - 1) - 0xAC00) % 28 ? a : b);   // 받침 유무로 을/를, 이/가 고르기
+
+// ---- 맵 생성: 방을 흩뿌리고 ㄱ자 복도로 잇는다. 같은 seed면 같은 맵. 왼쪽 끝 방이 시작 방 ----
+function genMap(cfg, seed) {
+  const M = cfg.mapGen, W = M.cols, H = M.rows, R = seededRng(seed);
+  const ri = (a, b) => a + Math.floor(R() * (b - a + 1));
+  const grid = Array.from({ length: H }, () => Array(W).fill('#'));
+  const rooms = [];
+  for (let i = 0; i < 400 && rooms.length < M.rooms; i++) {
+    const w = ri(M.roomW[0], M.roomW[1]), h = ri(M.roomH[0], M.roomH[1]);
+    const x = ri(1, W - w - 2), y = ri(1, H - h - 2);
+    if (rooms.some(o => x < o.x + o.w + 2 && x + w + 2 > o.x && y < o.y + o.h + 2 && y + h + 2 > o.y)) continue;   // 방 사이 벽 최소 1칸
+    rooms.push({ x, y, w, h, cx: x + Math.floor(w / 2), cy: y + Math.floor(h / 2) });
+  }
+  for (const o of rooms) for (let r = o.y; r < o.y + o.h; r++) for (let c = o.x; c < o.x + o.w; c++) grid[r][c] = '.';
+  const dig = (r, c) => { if (r > 0 && c > 0 && r < H - 1 && c < W - 1 && grid[r][c] === '#') grid[r][c] = '.'; };
+  const corridor = (a, b) => {
+    // 중간점을 거쳐 가는 ㄱ자 여러 개 → 길이 길어지고 꺾이며, 시야가 코너마다 끊긴다
+    const pts = [{ r: a.cy, c: a.cx }];
+    const r0 = Math.max(1, Math.min(a.cy, b.cy) - 3), r1 = Math.min(H - 2, Math.max(a.cy, b.cy) + 3), c0 = Math.max(1, Math.min(a.cx, b.cx) - 3), c1 = Math.min(W - 2, Math.max(a.cx, b.cx) + 3);
+    for (let i = 0; i < (M.bend || 0); i++) pts.push({ r: ri(r0, r1), c: ri(c0, c1) });   // 두 방 사이 범위 안에서만 꺾어, 맵을 가로지르는 긴 직선이 덜 생기게
+    pts.push({ r: b.cy, c: b.cx });
+    let r = pts[0].r, c = pts[0].c;
+    for (let i = 1; i < pts.length; i++) {
+      const t = pts[i];
+      const goH = () => { while (c !== t.c) { c += Math.sign(t.c - c); dig(r, c); } };
+      const goV = () => { while (r !== t.r) { r += Math.sign(t.r - r); dig(r, c); } };
+      if (R() < 0.5) { goH(); goV(); } else { goV(); goH(); }
+    }
+  };
+  rooms.sort((a, b) => a.cx - b.cx);
+  const order = rooms.slice(1); for (let i = order.length - 1; i > 0; i--) { const j = ri(0, i); [order[i], order[j]] = [order[j], order[i]]; }
+  order.unshift(rooms[0]);
+  for (let i = 1; i < order.length; i++) corridor(order[i - 1], order[i]);          // 사슬로 이으면 모든 방이 연결됨
+  for (let i = 0; i < M.loops; i++) corridor(rooms[ri(0, rooms.length - 1)], rooms[ri(0, rooms.length - 1)]);   // 돌아갈 길
+  const start = rooms[0];
+  grid[start.cy][start.cx] = 'S';
+  for (const o of rooms.slice(1)) grid[o.cy][o.cx] = 'o';
+  // 함정: 폭 1 복도 칸 중에서, 시작 방에서 떨어진 곳에 서로 3칸 이상 띄워 둔다
+  const cands = [];
+  for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) {
+    if (grid[r][c] !== '.') continue;
+    const n = grid[r - 1][c] !== '#', s = grid[r + 1][c] !== '#', w = grid[r][c - 1] !== '#', e = grid[r][c + 1] !== '#';
+    if (((n && s && !w && !e) || (w && e && !n && !s)) && Math.hypot(r - start.cy, c - start.cx) > 4) cands.push([r, c]);
+  }
+  const traps = [];
+  while (traps.length < (cfg.traps || 0) && cands.length) {
+    const [r, c] = cands.splice(ri(0, cands.length - 1), 1)[0];
+    if (traps.some(([tr, tc]) => Math.abs(tr - r) + Math.abs(tc - c) < 4)) continue;
+    traps.push([r, c]); grid[r][c] = 'T';
+  }
+  // 기름병: 바닥 아무 데나, 시작 방에서 떨어진 곳에 서로 5칸 이상 띄워
+  const floor = [];
+  for (let r = 1; r < H - 1; r++) for (let c = 1; c < W - 1; c++) if (grid[r][c] === '.' && Math.hypot(r - start.cy, c - start.cx) > 5) floor.push([r, c]);
+  const oils = [];
+  while (oils.length < (cfg.torch ? cfg.torch.oils : 0) && floor.length) {
+    const [r, c] = floor.splice(ri(0, floor.length - 1), 1)[0];
+    if (oils.some(([orr, oc]) => Math.abs(orr - r) + Math.abs(oc - c) < 5)) continue;
+    oils.push([r, c]); grid[r][c] = 'u';
+  }
+  return grid.map(row => row.join(''));
+}
+
+function phaseDuration(g, phase) {
+  const t = g.cfg.trap, L = Math.min(g.level, maxLevel(g.cfg));
+  if (phase === 'idle') return t.idleByLevel[L];
+  if (phase === 'warn') return t.warn;
+  if (phase === 'active') return t.active;
+  return t.restByLevel[L];
+}
+
+// 라운드 설정: 같은 맵·같은 규칙 위에 유물 구성과 수치만 바꾼다
+function roundCfg(n) {
+  const o = CONFIG.rounds[n];
+  if (!o) return { ...CONFIG };
+  return { ...CONFIG, round:n, maxScore:o.maxScore, goalText:o.goalText, ranks:o.ranks, relics:o.relics, traps:o.traps == null ? CONFIG.traps : o.traps,
+    guard:{ ...CONFIG.guard, ...o.guard }, collapse:{ ...CONFIG.collapse, ...o.collapse } };
+}
+function relicCatalog() { return [1, 2].map(n => ({ round:n, relics:Object.values(n === 1 ? CONFIG.relics : CONFIG.rounds[n].relics) })); }
+function roundUnlocked(P, n) { return n <= 1 || !!P.cleared[n - 1]; }
+// 한 판이 끝났을 때 도감(발견/확보)과 라운드 해금을 갱신. 확보 = 탈출하며 들고 나온 유물
+function applyRunToProfile(P, g) {
+  const out = { newFound:[], newGot:[] };
+  for (const rl of g.relics) if ((rl.seen || rl.everTaken) && !P.found[rl.id]) { P.found[rl.id] = 1; out.newFound.push(rl.name); }
+  if (g.state === 'escaped') {
+    for (const rl of g.carried) { if (!P.got[rl.id]) out.newGot.push(rl.name); P.got[rl.id] = (P.got[rl.id] || 0) + 1; P.found[rl.id] = 1; }
+    if (g.finalScore > 0) P.cleared[g.round || 1] = 1;
+  }
+  out.newFound = out.newFound.filter(n => !out.newGot.includes(n));
+  return out;
+}
+
+// 판 시작 설정: 고정 맵이면 라운드 1의 함정(T)을 지우고, 생성 맵이면 시드로 맵을 만든다
+function prepRunCfg(cfg) {
+  if (cfg.mapMode === 'gen') {
+    cfg.seed = (Date.now() % 1000000) || 1;   // 로그 첫 줄에 남아 같은 맵을 다시 볼 수 있다
+    cfg.map = genMap(cfg, cfg.seed);
+  } else {
+    cfg.seed = 0; cfg.zones = CONFIG.zones; cfg.guard = { ...cfg.guard, patrol: CONFIG.guard.patrol };
+    cfg.map = cfg.fixedMap.map(row => cfg.traps === 0 ? row.replace(/T/g, '.') : row);
+  }
+  return cfg;
+}
+function createGame(cfg) {
+  const rows = cfg.map.length, cols = cfg.map[0].length;
+  const g = {
+    cfg, round: cfg.round || 1, rows, cols, grid: [], traps: [], relics: [], start: null,
+    player: null, state: 'play', time: 0, level: 0, pickups: 0,
+    carried: [], lost: [], shard: 'none', invuln: 0,
+    finalScore: 0, deathCause: null, zone: null,
+    seen: [], visible: [], fx: [], log: [], trace: [], traceAcc: 0, traceLast: null, minGuardDist: null, silentInit: true,
+    collapse: { active:false, remaining:0, total:0, alerted:{} }, hinted: {},
+    spots: [], oils: [], light: false, lighting: 0, fuel: cfg.torch.fuelStart, rng: seededRng(((cfg.seed || 1) * 7 + 3) >>> 0),
+  };
+  for (let r = 0; r < rows; r++) {
+    g.grid.push([]); g.seen.push(new Array(cols).fill(false)); g.visible.push(new Array(cols).fill(0));
+    for (let c = 0; c < cols; c++) {
+      const ch = cfg.map[r][c];
+      g.grid[r].push(ch === '#' ? 1 : 0);
+      if (ch === 'S') g.start = { r, c };
+      if (ch === 'T') g.traps.push({ r, c, state:'idle', t:0, idx:g.traps.length });
+      if (ch === 'o') g.spots.push({ r, c });
+      if (ch === 'u') g.oils.push({ r, c, taken:false });
+      if (cfg.relics[ch]) g.relics.push({ ...cfg.relics[ch], key:ch, r, c, taken:false });
+    }
+  }
+  // 유물 자리: 시작점에서 걸어서 가까운 순으로 후보(방 가운데)를 줄 세우고, 싼 유물은 가까운 구간·비싼 유물은 먼 구간에서 하나씩 고른다
+  const dist = bfsDist(g, g.start.r, g.start.c);
+  if (!g.relics.length && g.spots.length) {
+    const spots = g.spots.slice().sort((a, b) => dist[a.r][a.c] - dist[b.r][b.c]), used = new Set();
+    const kinds = Object.entries(cfg.relics).sort((a, b) => a[1].value - b[1].value);
+    const band = Math.max(1, Math.floor(spots.length / kinds.length));
+    kinds.forEach(([key, def], i) => {
+      const lo = Math.min(i * band, spots.length - 1), hi = i === kinds.length - 1 ? spots.length : Math.min((i + 1) * band, spots.length);
+      let pick = lo + Math.floor(g.rng() * (hi - lo)); while (used.has(pick)) pick = (pick + 1) % spots.length;
+      used.add(pick); g.relics.push({ ...def, key, r: spots[pick].r, c: spots[pick].c, taken:false });
+    });
+    g.freeSpots = spots.filter((_, i) => !used.has(i));
+  }
+  // 함정 위상 초기화
+  for (const tr of g.traps) {
+    tr.state = 'idle'; tr.t = phaseDuration(g, 'idle');
+    stepTrap(g, tr, tr.idx * cfg.trap.offsetStep);
+  }
+  g.silentInit = false;
+  // 입구(탈출 지점) 바로 옆 바닥 칸에서 태어난다. 입구 위가 아니라 한 칸 옆이라, 아무것도 안 들고 곧장 탈출하는 일은 없다.
+  g.spawn = { r: g.start.r, c: g.start.c };
+  for (const [dr, dc] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+    const r = g.start.r + dr, c = g.start.c + dc;
+    if (r >= 0 && c >= 0 && r < rows && c < cols && !g.grid[r][c] && cfg.map[r][c] !== 'T') { g.spawn = { r, c }; break; }
+  }
+  g.player = { x: g.spawn.c + 0.5, y: g.spawn.r + 0.5, dir: 0 };
+  g.guards = [];
+  if (cfg.guard) {
+    let patrol = cfg.guard.patrol;
+    if (!patrol.length) {   // 생성 맵: 유물 없는 방 가운데를 먼 순으로. 석상 자리(첫 지점)는 유물에서 3칸 넘게 떨어진 곳
+      const free = (g.freeSpots || g.spots).slice().sort((a, b) => dist[b.r][b.c] - dist[a.r][a.c]);
+      const far = free.filter(s => g.relics.every(rl => Math.abs(rl.r - s.r) + Math.abs(rl.c - s.c) > 3));
+      patrol = (far.length ? far : free).map(s => [s.r, s.c]);
+      if (!patrol.length) patrol = [[g.start.r, g.start.c]];
+    }
+    g.patrol = patrol;
+    const [r0, c0] = patrol[0];
+    g.guards.push({ x: c0 + 0.5, y: r0 + 0.5, dir: Math.PI, state: 'dormant', stun: 0, wp: 0, path: [], target: null, lastNoise: -99, moving: false });
+  }
+  logEvent(g, 'start', `탐험 시작 (라운드 ${g.round}, 맵 ${cfg.seed || '고정'})`);
+  updateZone(g);
+  computeVisibility(g);
+  return g;
+}
+
+function isWall(g, c, r) {
+  if (r < 0 || c < 0 || r >= g.rows || c >= g.cols) return true;
+  return g.grid[r][c] === 1;
+}
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0');
+}
+
+function logEvent(g, type, msg) {
+  const e = { t: +g.time.toFixed(2), time: fmtTime(g.time), type, msg, level: g.level, carried: g.carried.map(r => r.name) };
+  g.log.push(e);
+}
+
+function stepTrap(g, tr, dt) {
+  tr.t -= dt;
+  while (tr.t <= 0) {
+    const prev = tr.state, next = TRAP_NEXT[prev];
+    tr.state = next;
+    tr.t += phaseDuration(g, next);
+    tr.lastEnter = next;
+    if (!g.silentInit) {
+      if (next === 'warn') g.fx.push({ type:'warn', r:tr.r, c:tr.c });
+      if (next === 'active') g.fx.push({ type:'fire', r:tr.r, c:tr.c });
+    }
+    if (g.onTrapTransition) g.onTrapTransition(tr, prev, next);
+  }
+}
+
+function blocked(g, x, y) {
+  const r = g.cfg.playerRadius;
+  return isWall(g, Math.floor(x - r), Math.floor(y - r)) || isWall(g, Math.floor(x + r), Math.floor(y - r)) ||
+         isWall(g, Math.floor(x - r), Math.floor(y + r)) || isWall(g, Math.floor(x + r), Math.floor(y + r));
+}
+
+function movePlayer(g, dx, dy, dt) {
+  const p = g.player;
+  if (!dx && !dy) return;
+  const len = Math.hypot(dx, dy); dx /= len; dy /= len;
+  p.dir = Math.atan2(dy, dx);
+  const sp = g.cfg.playerSpeed * dt, rad = g.cfg.playerRadius;
+  // x 축
+  if (dx) {
+    const nx = p.x + dx * sp;
+    if (!blocked(g, nx, p.y)) p.x = nx;
+    else if (!dy) { // 모서리 보정: 앞 칸이 열려 있으면 세로 중앙으로 미끄러짐
+      const cy = Math.floor(p.y), tx = Math.floor(p.x + Math.sign(dx) * (rad + 0.06));
+      if (!isWall(g, tx, cy)) { const target = cy + 0.5; const d = target - p.y; const ny = p.y + Math.sign(d) * Math.min(Math.abs(d), sp); if (!blocked(g, p.x, ny)) p.y = ny; }
+    }
+  }
+  if (dy) {
+    const ny = p.y + dy * sp;
+    if (!blocked(g, p.x, ny)) p.y = ny;
+    else if (!dx) {
+      const cx = Math.floor(p.x), ty = Math.floor(p.y + Math.sign(dy) * (rad + 0.06));
+      if (!isWall(g, cx, ty)) { const target = cx + 0.5; const d = target - p.x; const nx = p.x + Math.sign(d) * Math.min(Math.abs(d), sp); if (!blocked(g, nx, p.y)) p.x = nx; }
+    }
+  }
+}
+
+// 구역 이름: 맵이 매 판 바뀌므로 고정 이름 대신 위치로 부른다 (북서·북·북동·남서·남·남동)
+function zoneAt(g, r, c) {
+  if (g.cfg.zones) { for (const z of g.cfg.zones) if (r >= z.r0 && r <= z.r1 && c >= z.c0 && c <= z.c1) return z.name; return ''; }
+  return (r < g.rows / 2 ? '북' : '남') + ['서', '', '동'][Math.min(2, Math.max(0, Math.floor(c / g.cols * 3)))];
+}
+
+function updateZone(g) {
+  const z = zoneAt(g, Math.floor(g.player.y), Math.floor(g.player.x));
+  if (z && z !== g.zone) {
+    g.zone = z;
+    logEvent(g, 'zone', `구역 진입: ${z} (소지 ${g.carried.length}개, 위험 ${g.level})`);
+  }
+}
+
+function carriedScore(g) { return g.carried.reduce((s, r) => s + r.value, 0); }
+// 욕심 배율: 지금 개수 기준 / 하나 더 들었을 때
+function greedMult(g, n = g.carried.length) { const G = g.cfg.greed || [1]; return G[Math.min(n, G.length - 1)]; }
+function escapeScore(g) { return Math.round(carriedScore(g) * greedMult(g)); }
+
+function relicNear(g, range) {
+  const p = g.player; let best = null, bd = Infinity;
+  for (const rl of g.relics) {
+    if (rl.taken) continue;
+    const d = Math.hypot(rl.c + 0.5 - p.x, rl.r + 0.5 - p.y);
+    if (d <= range && d < bd) { best = rl; bd = d; }
+  }
+  return best;
+}
+
+function atExit(g) {
+  return Math.hypot(g.start.c + 0.5 - g.player.x, g.start.r + 0.5 - g.player.y) <= g.cfg.interactRange;
+}
+
+function pickup(g, rl) {
+  if (!rl || rl.taken || g.state !== 'play') return false;   // 중복 획득 방지
+  rl.taken = true;
+  g.carried.push(rl);
+  if (rl.protect) g.shard = 'held';
+  if (rl.rings) rl.ringT = rl.rings.every;
+  const first = !rl.everTaken;
+  rl.everTaken = true; rl.thrown = false;
+  if (!first) {   // 던졌던 유물을 되찾음: 위험·붕괴는 변하지 않음
+    logEvent(g, 'pickup', `회수: ${rl.name} (잠정 ${carriedScore(g)}점)`);
+    g.fx.push({ type:'pickup', r:rl.r, c:rl.c, relic:rl.id, regain:true });
+    return true;
+  }
+  g.pickups += 1;
+  logEvent(g, 'pickup', `획득: ${rl.name} (+${rl.value}, 잠정 ${carriedScore(g)}점)`);
+  g.fx.push({ type:'pickup', r:rl.r, c:rl.c, relic:rl.id });
+  const old = g.level;
+  g.level = Math.min(g.pickups, maxLevel(g.cfg));   // 누적 획득 수 기준, 내려가지 않음
+  const col = g.collapse, cc = g.cfg.collapse;
+  let colInfo = null;
+  if (cc.enabled) {
+    if (!col.active) {
+      col.active = true; col.remaining = cc.startTime; col.total = cc.startTime;
+      colInfo = { started:true, remaining:col.remaining };
+      logEvent(g, 'collapse', `붕괴 시작: ${cc.startTime}초 안에 입구로`);
+    } else {
+      const before = col.remaining;
+      col.remaining = Math.max(Math.min(before, cc.minAfterPickup), before - cc.perRelicCut);
+      colInfo = { started:false, cut:+(before - col.remaining).toFixed(1), remaining:col.remaining };
+      logEvent(g, 'collapse', `붕괴 가속: 남은 시간 ${before.toFixed(1)}초 → ${col.remaining.toFixed(1)}초`);
+    }
+  }
+  if (g.level > old) logEvent(g, 'danger', `위험 단계 ${old} → ${g.level}`);
+  g.fx.push({ type:'dangerUp', level:g.level, levelUp:g.level > old, collapse:colInfo });
+  return true;
+}
+
+function escape(g) {
+  if (g.state !== 'play') return false;
+  g.state = 'escaped';
+  g.finalScore = escapeScore(g);
+  logEvent(g, 'escape', `탈출 성공: ${carriedScore(g)} × ${greedMult(g)} = ${g.finalScore}점 확정 (소지 ${g.carried.length}개)`);
+  g.fx.push({ type:'escape' });
+  return true;
+}
+
+function die(g, tr, cause) {
+  g.state = 'dead';
+  for (const rl of g.carried) g.lost.push({ name:rl.name, value:rl.value, reason:'사망으로 잃음' });
+  g.carried = [];
+  g.finalScore = 0;
+  g.deathCause = cause || `${zoneAt(g, tr.r, tr.c) || '미로'}의 함정 (행 ${tr.r}, 열 ${tr.c}), 위험 단계 ${g.level}`;
+  logEvent(g, 'death', `사망: ${g.deathCause}`);
+  g.fx.push({ type:'death' });
+}
+
+function rankFor(cfg, score) { return cfg.ranks.find(r => score >= r.min) || cfg.ranks[cfg.ranks.length - 1]; }
+
+function updateCollapse(g, dt) {
+  const col = g.collapse;
+  if (!col.active) return;
+  col.remaining = Math.max(0, col.remaining - dt);
+  for (const a of g.cfg.collapse.alerts) {
+    if (col.remaining <= a && !col.alerted[a]) { col.alerted[a] = true; logEvent(g, 'collapse', `붕괴 ${a}초 전`); g.fx.push({ type:'collapseAlert', sec:a }); }
+  }
+  if (col.remaining <= 0) {
+    const zone = zoneAt(g, Math.floor(g.player.y), Math.floor(g.player.x)) || '미로';
+    die(g, null, `유적 붕괴로 매몰 (${zone}, 소지 ${g.carried.length}개)`);
+  }
+}
+
+function interact(g) {
+  if (g.state !== 'play') return null;
+  const rl = relicNear(g, g.cfg.interactRange);
+  if (rl) { pickup(g, rl); return 'pickup'; }
+  if (atExit(g)) { escape(g); return 'escape'; }
+  return null;
+}
+
+function trapAt(g, r, c) { return g.traps.find(t => t.r === r && t.c === c) || null; }
+
+// 피격 공통 처리: 봉인의 조각이 있으면 깨지며 막고, 없으면 사망
+function takeHit(g, cause, label) {
+  const i = g.carried.findIndex(r => r.protect);
+  if (i >= 0) {
+    const seal = g.carried.splice(i, 1)[0];
+    g.lost.push({ name:seal.name, value:seal.value, reason:'보호 발동으로 깨짐' });
+    g.shard = 'broken';
+    g.invuln = g.cfg.invulnTime;
+    const z = zoneAt(g, Math.floor(g.player.y), Math.floor(g.player.x)) || '미로';
+    logEvent(g, 'shield', `${seal.name}${josa(seal.name, '이', '가')} ${label}${josa(label, '을', '를')} 막고 깨짐 (−${seal.value}, 잠정 ${carriedScore(g)}점) @ ${z}`);
+    g.fx.push({ type:'shardBreak', x:g.player.x, y:g.player.y });
+    return 'shield';
+  }
+  die(g, null, cause);
+  return 'dead';
+}
+
+function checkTrapHit(g) {
+  const p = g.player;
+  const tr = trapAt(g, Math.floor(p.y), Math.floor(p.x));
+  if (!tr || tr.state !== 'active' || g.invuln > 0) return;
+  takeHit(g, `${zoneAt(g, tr.r, tr.c) || '미로'}의 함정 (행 ${tr.r}, 열 ${tr.c}), 위험 단계 ${g.level}`, '함정');
+}
+
+// 횃불: 몸을 중심으로 사방 radius칸. 꺼져 있으면 offAmbient칸만. 벽에 가려진 곳은 안 보임
+function computeVisibility(g) {
+  const p = g.player, F = g.cfg.torch, R = g.light ? F.radius : F.offAmbient;
+  for (let r = 0; r < g.rows; r++) g.visible[r].fill(0);
+  const r0 = Math.max(0, Math.floor(p.y - R - 1)), r1 = Math.min(g.rows - 1, Math.floor(p.y + R + 1));
+  const c0 = Math.max(0, Math.floor(p.x - R - 1)), c1 = Math.min(g.cols - 1, Math.floor(p.x + R + 1));
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+    const tx = c + 0.5, ty = r + 0.5, dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+    if (d > R + 0.5) continue;
+    const steps = Math.ceil(d / 0.25); let clear = true;
+    for (let i = 1; i < steps; i++) {
+      const sx = p.x + dx * i / steps, sy = p.y + dy * i / steps;
+      const cc = Math.floor(sx), rr = Math.floor(sy);
+      if ((cc !== c || rr !== r) && isWall(g, cc, rr)) { clear = false; break; }
+    }
+    if (!clear) continue;
+    g.visible[r][c] = Math.max(0.15, 1 - Math.pow(d / (R + 0.5), 2) * 0.85);
+    if (!g.light) g.visible[r][c] = Math.min(g.visible[r][c], 0.4);   // 꺼진 채로는 발밑만 어렴풋이
+    g.seen[r][c] = true;
+  }
+  for (const rl of g.relics) if (!rl.taken && g.light && g.visible[rl.r][rl.c] > 0) rl.seen = true;   // 유물은 횃불 빛에만 보인다. 한 번 보면 기억에 남는다
+}
+
+// ---- 수호자 ----
+function bfsPath(g, sr, sc, tr, tc) {
+  if (sr === tr && sc === tc) return [];
+  const key = (r, c) => r * g.cols + c, prev = new Map(), q = [[sr, sc]];
+  prev.set(key(sr, sc), -1);
+  while (q.length) {
+    const [r, c] = q.shift();
+    if (r === tr && c === tc) break;
+    for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (isWall(g, nc, nr) || prev.has(key(nr, nc))) continue;
+      prev.set(key(nr, nc), key(r, c)); q.push([nr, nc]);
+    }
+  }
+  if (!prev.has(key(tr, tc))) return [];
+  const out = []; let k = key(tr, tc);
+  while (k !== key(sr, sc)) { out.push({ r: Math.floor(k / g.cols), c: k % g.cols }); k = prev.get(k); }
+  return out.reverse();
+}
+
+function setGuardTarget(g, gd, r, c) {
+  gd.path = bfsPath(g, Math.floor(gd.y), Math.floor(gd.x), r, c);
+  gd.target = { r, c };
+}
+
+// 한 칸에서 모든 바닥 칸까지 걸음 수 (못 가는 곳은 Infinity)
+function bfsDist(g, sr, sc) {
+  const d = Array.from({ length: g.rows }, () => new Array(g.cols).fill(Infinity));
+  d[sr][sc] = 0; const q = [[sr, sc]];
+  while (q.length) {
+    const [r, c] = q.shift();
+    for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (isWall(g, nc, nr) || d[nr][nc] !== Infinity) continue;
+      d[nr][nc] = d[r][c] + 1; q.push([nr, nc]);
+    }
+  }
+  return d;
+}
+
+// 두 점 사이에 벽이 없는지 (어둠 속 눈 표시용)
+function hasLOS(g, x0, y0, x1, y1) {
+  const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 0.25));
+  for (let i = 1; i < steps; i++) { const x = x0 + (x1 - x0) * i / steps, y = y0 + (y1 - y0) * i / steps; if (isWall(g, Math.floor(x), Math.floor(y))) return false; }
+  return true;
+}
+
+// 횃불 켜고 끄기: 끄는 건 즉시, 켜는 건 lightDelay초 뒤에 붙고 그때 '탁' 소리가 난다
+function toggleLight(g) {
+  if (g.state !== 'play') return;
+  if (g.light) { g.light = false; g.lighting = 0; g.litTime = 0; logEvent(g, 'torch', '횃불 끔'); g.fx.push({ type:'light', on:false }); return; }
+  if (g.lighting > 0) return;
+  if (g.fuel <= 0) { g.fx.push({ type:'noFuel' }); return; }
+  g.lighting = g.cfg.torch.lightDelay; g.fx.push({ type:'lighting' });
+}
+function updateTorch(g, dt) {
+  const T_ = g.cfg.torch, p = g.player;
+  if (g.lighting > 0) {
+    g.lighting -= dt;
+    if (g.lighting <= 0) {
+      g.lighting = 0; g.light = true;
+      logEvent(g, 'torch', `횃불 켬 (기름 ${Math.ceil(g.fuel)}초)`); g.fx.push({ type:'light', on:true });
+      noiseAt(g, p.x, p.y, T_.lightNoise, '횃불 켜는 소리');
+    }
+  }
+  if (g.light) {
+    g.fuel = Math.max(0, g.fuel - dt);
+    if (g.fuel <= 0) { g.light = false; g.litTime = 0; logEvent(g, 'torch', '기름이 떨어져 횃불이 꺼짐'); g.fx.push({ type:'torchOut' }); }
+    // 오래 켜 두면 불빛이 멀리서 보인다: 수호자가 깨어나고 내 자리로 온다. 끄지 않으면 exposeTime마다 반복
+    g.litTime = (g.litTime || 0) + dt;
+    if (g.light && g.litTime >= T_.exposeTime) {
+      g.litTime = 0;
+      for (const gd of g.guards) if (gd.state === 'dormant') { gd.state = 'patrol'; logEvent(g, 'guard', '멀리서 보인 횃불 불빛에 수호자가 깨어났다'); g.fx.push({ type:'guardWake', x:gd.x, y:gd.y }); }
+      logEvent(g, 'torch', `횃불을 ${T_.exposeTime}초 넘게 켜 둠 — 불빛이 멀리서 보임`);
+      noiseAt(g, p.x, p.y, T_.exposeRadius, '멀리서 보이는 횃불 불빛');
+      g.fx.push({ type:'exposed' });
+    }
+  }
+  for (const o of g.oils) {   // 기름병은 밟으면 바로 줍는다
+    if (o.taken || Math.hypot(o.c + 0.5 - p.x, o.r + 0.5 - p.y) > 0.6) continue;
+    o.taken = true; const before = g.fuel; g.fuel = Math.min(T_.fuelMax, g.fuel + T_.oilRefill);
+    logEvent(g, 'oil', `기름병 획득 (+${Math.round(g.fuel - before)}초 → ${Math.ceil(g.fuel)}초)`);
+    g.fx.push({ type:'oil', r:o.r, c:o.c, gain:Math.round(g.fuel - before) });
+  }
+}
+
+// 소리가 나면 범위 안의 깨어 있는 수호자가 그 위치로 이동
+function noiseAt(g, x, y, radius, src) {
+  const r = Math.floor(y), c = Math.floor(x);
+  for (const gd of g.guards) {
+    if (gd.state === 'dormant' || gd.state === 'stunned') continue;
+    if (Math.hypot(gd.x - x, gd.y - y) > radius) continue;
+    const was = gd.state, gc = g.cfg.guard;
+    gd.lastNoise = g.time; gd.linger = null;
+    if (was === 'patrol') { gd.state = 'alert'; gd.alertT = gc.alertTime; }   // 바로 추격하지 않고 경계부터
+    if (!gd.target || gd.target.r !== r || gd.target.c !== c) {
+      if (gd.target && src === '던진 유물') logEvent(g, 'guard', `수호자 목표가 던진 유물 쪽으로 바뀜 (${zoneAt(g, r, c) || '미로'}, 칸 ${r},${c})`);
+      setGuardTarget(g, gd, r, c);
+    }
+    if (src === '던진 유물') gd.lure = { r, c };
+    if (was === 'patrol') {
+      logEvent(g, 'guard', `수호자가 소리를 듣고 경계 (${src}, ${zoneAt(g, r, c) || '미로'}, 칸 ${r},${c}, 수호자-소리 거리 ${Math.hypot(gd.x - x, gd.y - y).toFixed(1)}칸)`);
+      g.fx.push({ type:'guardAlert', x:gd.x, y:gd.y });
+    }
+  }
+}
+
+function guardSpeed(g, gd) {
+  const gc = g.cfg.guard;
+  if (gd.state === 'alert') return gc.alertSpeed;
+  return gc.baseSpeed + gc.speedPerRelic * g.carried.length + (gd.state === 'investigate' ? gc.investigateBonus : 0);
+}
+
+function updateGuards(g, dt, moved) {
+  const gc = g.cfg.guard, p = g.player;
+  if (!gc) return;
+  if (moved) noiseAt(g, p.x, p.y, gc.noiseBase + gc.noisePerRelic * g.carried.length, '발소리');
+  for (const gd of g.guards) {
+    if (gd.state === 'dormant') {
+      if (g.pickups > 0) { gd.state = 'patrol'; logEvent(g, 'guard', '수호자가 깨어났다'); g.fx.push({ type:'guardWake', x:gd.x, y:gd.y }); }
+      else continue;
+    }
+    if (gd.state === 'stunned') {
+      gd.stun -= dt; gd.moving = false;
+      if (gd.stun <= 0) { gd.state = 'patrol'; gd.path = []; gd.target = null; gd.trapImmune = gc.trapImmune; }
+      continue;
+    }
+    if (gd.trapImmune > 0) gd.trapImmune -= dt;
+    const tr = (gd.trapImmune > 0) ? null : trapAt(g, Math.floor(gd.y), Math.floor(gd.x));
+    if (tr && tr.state === 'active') {
+      gd.state = 'stunned'; gd.stun = gc.stunTrap; gd.path = []; gd.target = null; gd.moving = false;
+      logEvent(g, 'guard', `수호자가 함정에 걸려 ${gc.stunTrap}초 기절 (${zoneAt(g, tr.r, tr.c) || '미로'})`);
+      g.fx.push({ type:'guardStun', x:gd.x, y:gd.y });
+      continue;
+    }
+    // 불빛: 횃불을 켠 채 가까이(벽에 안 가린) 수호자가 있으면 들켜서 내 자리로 곧장 온다. 끄면 소리로만 찾는다
+    const gdist = Math.hypot(gd.x - p.x, gd.y - p.y);
+    if (g.light && gdist <= gc.seeRange && hasLOS(g, p.x, p.y, gd.x, gd.y)) {
+      if (gd.state === 'patrol') {
+        gd.state = 'alert'; gd.alertT = gc.alertTime * 0.5;
+        logEvent(g, 'guard', `수호자가 횃불 불빛을 봄 (${zoneAt(g, Math.floor(p.y), Math.floor(p.x))}, 거리 ${gdist.toFixed(1)}칸)`);
+        g.fx.push({ type:'guardAlert', x:gd.x, y:gd.y }); g.fx.push({ type:'seenHint' });
+      }
+      const pr = Math.floor(p.y), pc = Math.floor(p.x);
+      if (!gd.target || gd.target.r !== pr || gd.target.c !== pc) setGuardTarget(g, gd, pr, pc);
+      gd.linger = null; gd.lure = null;
+    }
+    if (gd.state === 'alert') {
+      gd.alertT -= dt;
+      if (gd.alertT <= 0) { gd.state = 'investigate'; logEvent(g, 'guard', `수호자가 추격 시작 (목표 칸 ${gd.target ? gd.target.r + ',' + gd.target.c : '없음'})`); }
+    }
+    if ((gd.state === 'investigate' || gd.state === 'alert') && gd.path.length === 0 && gd.target) {   // 소리 난 곳에 도착: 잠시 둘러본 뒤 순찰로
+      if (gd.linger == null) { gd.linger = gc.lingerTime; if (gd.lure && gd.lure.r === gd.target.r && gd.lure.c === gd.target.c) logEvent(g, 'guard', `수호자가 던진 유물 위치에 도착해 ${gc.lingerTime}초 조사 (유인됨)`); }
+      gd.linger -= dt; gd.moving = false;
+      if (gd.linger <= 0) { gd.state = 'patrol'; gd.target = null; gd.linger = null; gd.lure = null; }
+    }
+    if (gd.state === 'patrol' && gd.path.length === 0) {
+      // 소리가 없어도 가끔 플레이어 근처 칸으로 어슬렁거리며 다가온다 (정확한 위치는 모름). 멀리 있으면 그냥 순찰
+      if (gdist <= gc.creepRange && g.rng() < gc.creepChance) {
+        const pr = Math.floor(p.y) + Math.round((g.rng() * 2 - 1) * gc.creepRadius), pc = Math.floor(p.x) + Math.round((g.rng() * 2 - 1) * gc.creepRadius);
+        if (!isWall(g, pc, pr)) setGuardTarget(g, gd, pr, pc);
+      }
+      if (!gd.path.length) { gd.wp = (gd.wp + 1) % g.patrol.length; const [r, c] = g.patrol[gd.wp]; setGuardTarget(g, gd, r, c); }
+    }
+    gd.moving = false;
+    if (gd.path.length && gd.grab == null) {   // 손을 뻗는 동안은 제자리 — 그 사이 벗어날 수 있다
+      const nx = gd.path[0].c + 0.5, ny = gd.path[0].r + 0.5, dx = nx - gd.x, dy = ny - gd.y, dist = Math.hypot(dx, dy), step = guardSpeed(g, gd) * dt;
+      if (dist <= step) { gd.x = nx; gd.y = ny; gd.path.shift(); }
+      else { gd.x += dx / dist * step; gd.y += dy / dist * step; }
+      gd.dir = Math.atan2(dy, dx); gd.moving = true;
+    }
+    if (g.state === 'play' && g.invuln <= 0) {
+      const d = Math.hypot(gd.x - p.x, gd.y - p.y);
+      if (d < gc.grabRange) {
+        if (gd.grab == null) { gd.grab = gc.grabTime; gd.dir = Math.atan2(p.y - gd.y, p.x - gd.x); logEvent(g, 'guard', `수호자가 손을 뻗음 (거리 ${d.toFixed(1)}칸)`); g.fx.push({ type:'grab', x:gd.x, y:gd.y }); }
+        gd.grab -= dt;
+        if (gd.grab <= 0) {
+          gd.grab = null;
+          const res = takeHit(g, `수호자에게 붙잡힘 (${zoneAt(g, Math.floor(p.y), Math.floor(p.x)) || '미로'}, 소지 ${g.carried.length}개, 위험 단계 ${g.level})`, '수호자');
+          if (res === 'shield') { gd.state = 'stunned'; gd.stun = gc.stunShield; gd.path = []; gd.target = null; gd.moving = false; }
+        }
+      } else if (gd.grab != null) {
+        gd.grab = null; logEvent(g, 'guard', '수호자의 손을 피함'); g.fx.push({ type:'dodged' });
+        setGuardTarget(g, gd, Math.floor(p.y), Math.floor(p.x));   // 놓쳤어도 바로 다시 쫓는다
+      }
+    } else gd.grab = null;
+  }
+}
+
+// ---- 던지기 / 마우스 ----
+function throwLanding(g, tx, ty) {
+  const p = g.player, L0 = Math.hypot(tx - p.x, ty - p.y);
+  if (L0 < 0.01) return null;
+  const ux = (tx - p.x) / L0, uy = (ty - p.y) / L0, maxd = Math.min(L0, g.cfg.throwRange);
+  let lx = p.x, ly = p.y;
+  for (let s = 0.2; s <= maxd + 1e-9; s += 0.2) {
+    const x = p.x + ux * s, y = p.y + uy * s;
+    if (isWall(g, Math.floor(x), Math.floor(y))) break;
+    lx = x; ly = y;
+  }
+  return { x: lx, y: ly, r: Math.floor(ly), c: Math.floor(lx) };
+}
+
+// 가장 값싼 유물을 미끼로 던진다. 떨어진 자리에 남아 다시 주울 수 있고, 떨어질 때 소리가 난다
+function throwRelic(g, tx, ty, pick) {
+  if (g.state !== 'play' || !g.carried.length) return null;
+  const land = throwLanding(g, tx, ty);
+  if (!land) return null;
+  let idx = 0; g.carried.forEach((r, i) => { if (r.value <= g.carried[idx].value) idx = i; });
+  if (pick) { idx = g.carried.indexOf(pick); if (idx < 0) return null; }
+  const rl = g.carried.splice(idx, 1)[0];
+  rl.taken = false; rl.thrown = true; rl.r = land.r; rl.c = land.c;
+  if (rl.protect) g.shard = 'none';
+  if (rl.rings) { rl.ringsLeft = rl.rings.thrownRings; rl.ringT = 1.0; }   // 떨어진 자리에서 1초 뒤부터 몇 번 더 울린다
+  g.seen[land.r][land.c] = true;
+  const nearG = g.guards.filter(x => x.state !== 'dormant').map(x => Math.hypot(x.x - land.x, x.y - land.y)).sort((a, b) => a - b)[0];
+  logEvent(g, 'throw', `던짐: ${rl.name} → ${zoneAt(g, land.r, land.c) || '미로'} (칸 ${land.r},${land.c}, 수호자와 ${nearG === undefined ? '-' : nearG.toFixed(1) + '칸'}, 잠정 ${carriedScore(g)}점)`);
+  g.fx.push({ type:'throw', x:land.x, y:land.y });
+  noiseAt(g, land.x, land.y, g.cfg.throwNoiseRadius, '던진 유물');
+  return rl;
+}
+
+// 1·2·3 키: 화면 위쪽 유물 칸(값 낮은 순)과 같은 번호의 유물을 던진다. 마우스 좌표가 없으면 바라보는 방향으로 던진다.
+// 방어 유물은 실수로 방어를 잃지 않도록 throwConfirm초 안에 한 번 더 눌러야 던져진다.
+const slotList = g => g.relics.slice().sort((a, b) => a.value - b.value);
+function throwSlot(g, n, tx, ty) {
+  if (g.state !== 'play') return { result: 'idle' };
+  const rl = slotList(g)[n - 1];
+  if (!rl || !g.carried.includes(rl)) return { result: 'none', relic: rl || null };
+  if (rl.protect && !(g.throwArm && g.throwArm.id === rl.id && g.time - g.throwArm.t <= g.cfg.throwConfirm)) { g.throwArm = { id: rl.id, t: g.time }; return { result: 'confirm', relic: rl }; }
+  g.throwArm = null;
+  if (tx == null || ty == null) { const p = g.player, a = p.aim !== undefined ? p.aim : (p.dir || 0); tx = p.x + Math.cos(a) * g.cfg.throwRange; ty = p.y + Math.sin(a) * g.cfg.throwRange; }
+  return { result: throwRelic(g, tx, ty, rl) ? 'thrown' : 'blocked', relic: rl };
+}
+
+// 마우스 좌클릭(월드 좌표, 타일 단위): 유물 줍기 / 입구에서 탈출. 멀면 'far'
+function clickAt(g, x, y) {
+  if (g.state !== 'play') return null;
+  const p = g.player, R = g.cfg.mouseRange;
+  let best = null, bd = Infinity;
+  for (const rl of g.relics) {
+    if (rl.taken || !rl.seen) continue;   // 횃불로 한 번 본 유물만 (기억한 자리는 어둠 속에서도 주울 수 있다)
+    const d = Math.hypot(rl.c + 0.5 - x, rl.r + 0.5 - y);
+    if (d <= 0.75 && d < bd) { best = rl; bd = d; }
+  }
+  if (best) {
+    if (Math.hypot(best.c + 0.5 - p.x, best.r + 0.5 - p.y) > R) return 'far';
+    pickup(g, best); return 'pickup';
+  }
+  const sx = g.start.c + 0.5, sy = g.start.r + 0.5;
+  if (Math.hypot(sx - x, sy - y) <= 0.9) {
+    if (Math.hypot(sx - p.x, sy - p.y) > R) return 'far';
+    escape(g); return 'escape';
+  }
+  return null;
+}
+
+function updateGame(g, dt, input) {
+  if (g.state !== 'play') return;
+  dt = Math.min(dt, 0.05);
+  g.time += dt;
+  if (g.invuln > 0) g.invuln = Math.max(0, g.invuln - dt);
+  for (const tr of g.traps) stepTrap(g, tr, dt);
+  if (input.aim !== undefined) {   // 손전등은 마우스를 바로 따라가지 않고 최대 turnSpeed로 돈다
+    const p = g.player, cur = p.aim === undefined ? input.aim : p.aim;
+    let diff = input.aim - cur; while (diff > Math.PI) diff -= 2 * Math.PI; while (diff < -Math.PI) diff += 2 * Math.PI;
+    const step = g.cfg.torch.turnSpeed * dt;
+    p.aim = Math.abs(diff) <= step ? input.aim : cur + Math.sign(diff) * step;
+  }
+  const px0 = g.player.x, py0 = g.player.y;
+  movePlayer(g, input.dx, input.dy, dt);
+  const moved = Math.hypot(g.player.x - px0, g.player.y - py0) > 1e-6;
+  updateZone(g);
+  checkTrapHit(g);
+  if (g.state === 'play') updateTorch(g, dt);
+  // 방울: 들고 있으면 주기적으로 울려 위치를 알린다. 던져 놓으면 그 자리에서 몇 번 더 울려 미끼가 된다
+  for (const rl of g.relics) {
+    if (!rl.rings) continue;
+    const held = g.carried.includes(rl), onFloor = rl.thrown && !rl.taken && (rl.ringsLeft || 0) > 0;
+    if (!held && !onFloor) continue;
+    rl.ringT = (rl.ringT == null ? rl.rings.every : rl.ringT) - dt;
+    if (rl.ringT > 0) continue;
+    rl.ringT = rl.rings.every;
+    const x = held ? g.player.x : rl.c + 0.5, y = held ? g.player.y : rl.r + 0.5;
+    if (!held) rl.ringsLeft--;
+    noiseAt(g, x, y, rl.rings.radius, held ? `${rl.name} 소리` : `바닥에 떨어진 ${rl.name} 소리`);
+    g.fx.push({ type:'bell', x, y, held, relic:rl.id });
+  }
+  if (g.state === 'play') updateGuards(g, dt, moved);
+  g.traceAcc += dt;
+  if (g.traceAcc >= 1) {   // 1초마다 수호자-플레이어 거리, 수호자 상태, 목표, 목표 변경 여부를 기록 (재미/난이도 분석용)
+    g.traceAcc -= 1;
+    for (const gd of g.guards) {
+      if (gd.state === 'dormant') continue;
+      const d = Math.hypot(gd.x - g.player.x, gd.y - g.player.y), tg = gd.target ? gd.target.r + ',' + gd.target.c : '-';
+      const changed = g.traceLast !== null && g.traceLast !== tg;
+      g.traceLast = tg;
+      if (g.minGuardDist === null || d < g.minGuardDist) g.minGuardDist = d;
+      g.trace.push({ t: +g.time.toFixed(1), dist: +d.toFixed(1), state: gd.state, target: tg, changed, zone: zoneAt(g, Math.floor(g.player.y), Math.floor(g.player.x)) || '미로' });
+    }
+  }
+  if (g.state === 'play') updateCollapse(g, dt);
+  computeVisibility(g);
+}
+// ===== LOGIC END =====
+
+// ---------------- 오디오 (외부 리소스 없이 합성음) ----------------
+const Audio_ = {
+  ctx: null, on: true, out: null, last: {},
+  init() {
+    if (this.ctx) return;
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const m = this.ctx.createGain(); m.gain.value = 0.75;
+      const c = this.ctx.createDynamicsCompressor(); c.threshold.value = -20; c.ratio.value = 8; c.attack.value = 0.003; c.release.value = 0.2;
+      m.connect(c); c.connect(this.ctx.destination); this.out = m;
+    } catch (e) { this.ctx = null; }
+  },
+  // 같은 소리가 겹쳐 노래처럼 들리지 않도록 소리마다 최소 간격을 둔다
+  gate(name, gap) { const t = performance.now() / 1000; if (t - (this.last[name] || -99) < gap) return false; this.last[name] = t; return true; },
+  tone(freq, dur, type = 'sine', vol = 0.2, when = 0, slideTo = null) {
+    if (!this.on || !this.ctx || vol <= 0.001) return;
+    const t = this.ctx.currentTime + when, o = this.ctx.createOscillator(), gn = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(vol, t + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gn).connect(this.out); o.start(t); o.stop(t + dur + 0.02);
+  },
+  noise(dur, vol = 0.2, when = 0, hp = 800) {
+    if (!this.on || !this.ctx) return;
+    const t = this.ctx.currentTime + when, n = Math.floor(this.ctx.sampleRate * dur), buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), gn = this.ctx.createGain();
+    f.type = 'highpass'; f.frequency.value = hp; gn.gain.value = vol; s.buffer = buf;
+    s.connect(f).connect(gn).connect(this.out); s.start(t);
+  },
+  // 경고음은 음높이 없는 '다닥다닥' 소리라 겹쳐도 멜로디가 되지 않는다
+  warn(v) { if (!this.gate('warn', 0.45)) return; [0, 0.1, 0.2].forEach(w => this.noise(0.045, 0.3 * v, w, 1800)); },
+  fire(v) { if (!this.gate('fire', 0.3)) return; this.noise(0.14, 0.22 * v, 0, 300); this.tone(100, 0.14, 'sawtooth', 0.1 * v, 0, 55); },
+  pickup() { if (!this.gate('pickup', 0.25)) return; this.tone(880, 0.16, 'sine', 0.14); this.tone(1319, 0.22, 'sine', 0.12, 0.07); },
+  dangerUp() { if (!this.gate('danger', 0.8)) return; this.tone(185, 0.9, 'sine', 0.15); },
+  shardBreak() { if (!this.gate('shard', 0.5)) return; this.noise(0.3, 0.32, 0, 2000); this.tone(1568, 0.2, 'sine', 0.1, 0.02); },
+  step(v) { if (!this.gate('step', 0.14)) return; this.noise(0.06, 0.26 * v, 0, 100); this.tone(70, 0.09, 'sine', 0.22 * v, 0, 45); },
+  growl(v) { if (!this.gate('growl', 1.2)) return; this.tone(110, 0.55, 'sawtooth', 0.13 * v, 0, 55); },
+  clack(v) { if (!this.gate('clack', 0.15)) return; this.noise(0.07, 0.3 * v, 0, 2500); this.tone(700, 0.06, 'square', 0.08 * v, 0, 380); },
+  zap(v) { if (!this.gate('zap', 0.4)) return; this.noise(0.22, 0.18 * v, 0, 1500); this.tone(1100, 0.25, 'sawtooth', 0.1 * v, 0, 200); },
+  rockfall(v = 1) { if (!this.gate('rock', 0.7)) return; this.noise(0.5, 0.24 * v, 0, 120); this.tone(55, 0.6, 'triangle', 0.18 * v, 0, 35); },
+  rumble(v) { if (!this.gate('rumble', 3)) return; this.noise(1.0, 0.07 * v, 0, 60); this.tone(45, 1.0, 'sine', 0.1 * v); },
+  heart(v) { this.tone(55, 0.12, 'sine', 0.22 * v, 0, 40); this.tone(50, 0.1, 'sine', 0.16 * v, 0.16, 38); },
+  bell(v) { if (!this.gate('bell', 0.5)) return; this.tone(1240, 0.55, 'sine', 0.12 * v, 0, 1150); this.tone(1860, 0.3, 'sine', 0.05 * v, 0.02); },
+  escape() { [523, 659, 784].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.16, i * 0.1)); },
+  death() { this.tone(300, 0.9, 'sawtooth', 0.16, 0, 55); this.noise(0.4, 0.2, 0, 200); },
+};
+
+// ---------------- 화면 / 입력 ----------------
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const $ = id => document.getElementById(id);
+const SESSION = { runs: [], best: 0 };
+const bestKey = n => n === 1 ? 'ringingLootBest' : 'ringingLootBest_r' + n;
+function loadBest(n) { try { return +(localStorage.getItem(bestKey(n)) || 0); } catch (e) { return 0; } }
+SESSION.best = loadBest(1);
+// 도감·해금 진행: 이 브라우저에만 저장됨
+const PROFILE = { found: {}, got: {}, cleared: {} };
+try { const sv = JSON.parse(localStorage.getItem('ringingLootProfile') || '{}'); for (const k of ['found', 'got', 'cleared']) if (sv[k] && typeof sv[k] === 'object') PROFILE[k] = sv[k]; } catch (e) {}
+function saveProfile() { try { localStorage.setItem('ringingLootProfile', JSON.stringify(PROFILE)); } catch (e) {} }
+let currentRound = 1, codexOpen = false;
+let rumbleTimer = 0, heartT = 0;
+const mouse = { x: 0, y: 0, sx: 0, sy: 0, inside: false };   // x,y: 타일 좌표 / sx,sy: 캔버스 픽셀
+let slotSig = '';
+let game = null, screen = 'start', particles = [], flash = { a:0, color:'255,255,255' }, shake = 0, toastTimer = 0;
+const keys = new Set();
+const T = CONFIG.tile;
+cv.width = 900; cv.height = 600;
+const ZOOM = 2.0;                 // 확대 배율: 캐릭터·벽·함정을 크게 보여줌
+const cam = { x: 0, y: 0 };       // 카메라(월드 픽셀). 플레이어를 따라감
+function updateCamera(g, snap) {
+  const W = g.cols * T, H = g.rows * T, vw = cv.width / ZOOM, vh = cv.height / ZOOM;
+  let tx = g.player.x * T - vw / 2, ty = g.player.y * T - vh / 2;
+  tx = W <= vw ? (W - vw) / 2 : Math.max(0, Math.min(W - vw, tx));
+  ty = H <= vh ? (H - vh) / 2 : Math.max(0, Math.min(H - vh, ty));
+  if (snap) { cam.x = tx; cam.y = ty; } else { cam.x += (tx - cam.x) * 0.2; cam.y += (ty - cam.y) * 0.2; }
+}
+function syncMouse() { if (mouse.inside) { mouse.x = (mouse.sx / ZOOM + cam.x) / T; mouse.y = (mouse.sy / ZOOM + cam.y) / T; } }
+
+function newRun(round) {
+  if (round) currentRound = round;
+  if (!roundUnlocked(PROFILE, currentRound)) currentRound = 1;
+  SESSION.best = loadBest(currentRound);
+  $('app').classList.remove('title');
+  const cfg = roundCfg(currentRound);
+  prepRunCfg(cfg);
+  game = createGame(cfg);
+  updateCamera(game, true);
+  particles = []; flash.a = 0; shake = 0;
+  SESSION.runs.push({ run: SESSION.runs.length + 1, round: currentRound, log: game.log, result: null });
+  screen = 'play';
+  $('startScreen').classList.add('hidden'); $('resultScreen').classList.add('hidden');
+  updateHUD();
+  const g0 = game; setTimeout(() => { if (game === g0 && game.state === 'play' && !game.light) toast('어둡다. F를 누르면 횃불이 켜지고 유물이 보인다 — 8초 넘게 켜 두면 수호자가 온다', '', 3600); }, 900);
+}
+
+function toast(msg, cls = '', ms = 1800) {
+  const el = $('toast'); el.textContent = msg; el.className = 'show ' + cls; toastTimer = ms / 1000;
+}
+
+function burst(x, y, color, n = 18, speed = 3) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = speed * (0.4 + Math.random());
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.6 + Math.random() * 0.5, max: 1.1, color, size: 2 + Math.random() * 3 });
+  }
+}
+
+function handleFx() {
+  const p = game.player;
+  for (const f of game.fx) {
+    if (f.type === 'warn' || f.type === 'fire') {
+      const d = Math.hypot(f.c + 0.5 - p.x, f.r + 0.5 - p.y);
+      if (d <= CONFIG.hearRadius) {
+        const v = Math.pow(1 - d / CONFIG.hearRadius, 1.3);
+        if (f.type === 'warn') {   // 경고음은 가장 가까운 경고 함정 하나만 들려준다 (여러 개가 겹치지 않게)
+          const nearer = game.traps.some(t => t.state === 'warn' && (t.r !== f.r || t.c !== f.c) && Math.hypot(t.c + 0.5 - p.x, t.r + 0.5 - p.y) < d);
+          if (!nearer) Audio_.warn(v);
+          if (!game.hinted.trap && d <= 5 && game.visible[f.r][f.c] > 0) { game.hinted.trap = true; toast('바닥에 빨간 금이 간다 — 함정! 밟지 마세요', 'bad', 3000); }
+        } else if (d <= 5) Audio_.fire(v * 0.8);
+      }
+    } else if (f.type === 'bell') {
+      const d = Math.hypot(f.x - p.x, f.y - p.y); Audio_.bell(Math.max(0.25, 1 - d / 12));
+      burst(f.x, f.y - 0.3, '255,233,176', 6, 1.2);
+      if (f.held && !game.hinted.bell) { game.hinted.bell = true; toast('방울이 울린다 — 소리가 수호자를 부른다. 던져 버리면(1·우클릭) 조용해진다', 'bad', 3400); }
+    } else if (f.type === 'lighting') {
+      Audio_.clack(0.6);
+    } else if (f.type === 'light') {
+      if (f.on) { Audio_.fire(0.5); burst(p.x, p.y - 0.4, '255,154,60', 10, 1.5); }
+      if (f.on && !game.hinted.lit) { game.hinted.lit = true; toast('횃불 켬 — 이제 유물이 보인다. 수호자도 불빛을 본다', 'gold', 2600); }
+      else if (!f.on && !game.hinted.off) { game.hinted.off = true; toast('횃불 끔 — 본 유물은 기억에 남는다. 멈춰 있으면 발소리도 없다', '', 2800); }
+    } else if (f.type === 'grab') {
+      Audio_.growl(1); shake = Math.max(shake, 0.35);
+      if (!game.hinted.grab) { game.hinted.grab = true; toast('잡힌다 — 뛰어!', 'bad', 1400); }
+    } else if (f.type === 'dodged') {
+      Audio_.clack(0.7); toast('피했다!', 'gold', 900);
+    } else if (f.type === 'exposed') {
+      Audio_.growl(0.8); shake = Math.max(shake, 0.25); flash = { a:0.18, color:'255,120,40' };
+      if (!game.hinted.exposed) { game.hinted.exposed = true; toast('불빛이 너무 오래 켜져 있었다 — 수호자가 이쪽으로 온다! 끄고 자리를 옮겨라', 'bad', 3600); }
+      else toast('불빛 노출 — 수호자가 이쪽으로', 'bad', 1800);
+    } else if (f.type === 'torchOut') {
+      Audio_.noise(0.35, 0.18, 0, 500); toast('기름이 떨어져 횃불이 꺼졌다 — 바닥의 불씨(기름병)를 찾아라', 'bad', 3200);
+    } else if (f.type === 'noFuel') {
+      toast('기름이 없다 — 기름병을 밟으면 찬다', 'bad', 1600);
+    } else if (f.type === 'oil') {
+      Audio_.pickup(); burst(f.c + 0.5, f.r + 0.5, '255,154,60', 14, 2);
+      toast(`기름병 +${f.gain}초`, 'gold', 1400);
+    } else if (f.type === 'seenHint') {
+      if (!game.hinted.seen) { game.hinted.seen = true; toast('불빛을 들켰다! 횃불을 끄고 그 자리를 벗어나 조용히 숨어라', 'bad', 2800); }
+    } else if (f.type === 'pickup') {
+      Audio_.pickup(); burst(f.c + 0.5, f.r + 0.5, '242,193,78', 24, 2.5);
+      const rl = game.relics.find(r => r.id === f.relic);
+      toast(f.regain ? `${rl.name} 회수` : `${rl.name} 획득 (+${rl.value})`, 'gold');
+      if (!f.regain && !game.hinted[rl.id]) {   // 그 순간 한 줄 사용법 (처음 얻을 때 한 번)
+        game.hinted[rl.id] = true;
+        const idx = slotList(game).indexOf(rl) + 1;
+        setTimeout(() => { if (game && game.state === 'play') toast(relicHint(rl, idx), '', 3200); }, 1700);
+      }
+    } else if (f.type === 'dangerUp') {
+      // 획득의 기쁨과 대가(위험·붕괴)가 섞이지 않도록 0.9초 뒤에 따로 알림
+      setTimeout(() => {
+        if (!game || game.state !== 'play') return;
+        const c = f.collapse;
+        if (c) { Audio_.rockfall(c.started ? 0.8 : 1); dustBurst(c.started ? 14 : 24); shake = Math.max(shake, c.started ? 0.45 : 0.6); }
+        if (f.levelUp) setTimeout(() => Audio_.dangerUp(), c ? 600 : 0);
+        flash = { a:0.22, color:'255,120,40' };
+        const parts = [];
+        if (c && c.started) parts.push(`유적이 무너지기 시작했다! ${Math.round(c.remaining)}초`);
+        else if (c) parts.push(`붕괴 가속 −${Math.round(c.cut)}초`);
+        if (f.levelUp) parts.push(`위험 단계 ${f.level}`);
+        toast(parts.join(' · '), 'bad', 2600);
+      }, 900);
+    } else if (f.type === 'collapseAlert') {
+      Audio_.rockfall(0.7); dustBurst(16); shake = Math.max(shake, 0.4);
+      toast(`붕괴까지 ${f.sec}초!`, 'bad', 2000);
+    } else if (f.type === 'shardBreak') {
+      Audio_.shardBreak(); burst(f.x, f.y, '242,193,78', 30, 4); burst(f.x, f.y, '160,240,230', 20, 3);
+      flash = { a:0.55, color:'255,255,255' }; shake = 0.35;
+      toast('봉인의 조각이 깨졌다! 목숨을 지켰지만 −300', 'bad', 2400);
+    } else if (f.type === 'guardWake') {
+      const d = Math.hypot(f.x - p.x, f.y - p.y); Audio_.growl(d <= 12 ? 0.9 : 0.5);
+      toast('수호자가 깨어났다…', 'bad', 2200); shake = Math.max(shake, 0.3);
+    } else if (f.type === 'guardAlert') {
+      const d = Math.hypot(f.x - p.x, f.y - p.y);
+      if (d <= CONFIG.guard.hearRadius + 3) Audio_.growl(Math.max(0.3, 1 - d / (CONFIG.guard.hearRadius + 3)));
+    } else if (f.type === 'guardStun') {
+      const d = Math.hypot(f.x - p.x, f.y - p.y); Audio_.zap(Math.max(0.3, 1 - d / 14));
+      burst(f.x, f.y, '255,120,60', 20, 3);
+      // 안내는 가까이 있을 때만, 그리고 연달아 뜨지 않게 6초에 한 번
+      if (d <= 8 && (game.time - (game.lastStunToast ?? -99)) > 6) { game.lastStunToast = game.time; toast('수호자가 함정에 걸렸다!', 'gold', 1800); }
+    } else if (f.type === 'throw') {
+      const d = Math.hypot(f.x - p.x, f.y - p.y); Audio_.clack(Math.max(0.35, 1 - d / 14));
+      burst(f.x, f.y, '242,193,78', 10, 2); toast('유물을 던졌다 — 소리가 퍼진다', '', 1500);
+    } else if (f.type === 'escape') {
+      Audio_.escape(); finishRun();
+    } else if (f.type === 'death') {
+      Audio_.death(); flash = { a:0.7, color:'255,40,30' }; shake = 0.5; burst(p.x, p.y, '255,80,60', 30, 3.5);
+      setTimeout(finishRun, 700);
+    }
+  }
+  game.fx.length = 0;
+}
+
+function dustBurst(n) {
+  const p = game.player;
+  for (let i = 0; i < n; i++) {
+    const x = p.x + (Math.random() - 0.5) * 7, y = p.y + (Math.random() - 0.5) * 7;
+    particles.push({ x, y: y - 0.6, vx: (Math.random() - 0.5) * 0.3, vy: 0.8 + Math.random() * 1.2, life: 0.8 + Math.random() * 0.6, max: 1.4, color: Math.random() < 0.5 ? '150,170,160' : '110,95,80', size: 2 + Math.random() * 3 });
+  }
+}
+
+function finishRun() {
+  const g = game, run = SESSION.runs[SESSION.runs.length - 1];
+  const isBest = g.finalScore > SESSION.best;
+  if (isBest) { SESSION.best = g.finalScore; try { localStorage.setItem(bestKey(g.round), String(SESSION.best)); } catch (e) {} }
+  const cod = applyRunToProfile(PROFILE, g); saveProfile();
+  run.result = { round: g.round, outcome: g.state === 'escaped' ? '탈출 성공' : '사망', score: g.finalScore, time: fmtTime(g.time), kept: g.state === 'escaped' ? g.carried.map(r => r.name) : [], lost: g.lost.map(l => `${l.name}(${l.reason})`) };
+  console.log('[울리는 전리품] run', run.run, run.result, run.log);
+  screen = 'result';
+  const ok = g.state === 'escaped';
+  $('resTitle').textContent = ok ? '탈출 성공' : '사망 — 유물을 모두 잃었습니다';
+  $('resTitle').className = ok ? 'ok' : 'bad';
+  $('resScore').textContent = g.finalScore + '점' + (isBest ? '  — 신기록!' : '');
+  $('resRank').textContent = rankFor(g.cfg, g.finalScore).name;
+  $('resBest').textContent = SESSION.best + `점 (목표 ${g.cfg.maxScore}점)`;
+  $('resRoundTxt').textContent = '라운드 ' + g.round;
+  const tot = relicCatalog().reduce((n, r) => n + r.relics.length, 0), gotN = Object.keys(PROFILE.got).length, foundN = Object.keys(PROFILE.found).length;
+  const lostFound = g.relics.filter(rl => (rl.seen || rl.everTaken) && !PROFILE.got[rl.id]).map(rl => rl.name);
+  $('resCodex').textContent = [cod.newGot.length ? '새로 확보: ' + cod.newGot.join(', ') : '', cod.newFound.length ? '새로 발견: ' + cod.newFound.join(', ') : '', lostFound.length ? '발견했지만 아직 못 가져옴: ' + lostFound.join(', ') : '', `확보 ${gotN}/${tot} · 발견 ${foundN}/${tot}`].filter(Boolean).join(' / ');
+  const nb = $('nextBtn'), canR2 = roundUnlocked(PROFILE, 2);
+  if (g.round === 1) { nb.style.display = canR2 ? '' : 'none'; nb.textContent = '라운드 2 도전'; nb.dataset.round = 2; }
+  else { nb.style.display = ''; nb.textContent = '라운드 1로'; nb.dataset.round = 1; }
+  refreshStart();
+  $('resKept').textContent = ok && g.carried.length ? g.carried.map(r => `${r.name}(${r.value})`).join(', ') : '없음';
+  $('resLost').textContent = g.lost.length ? g.lost.map(l => `${l.name} — ${l.reason}`).join(', ') : '없음';
+  $('resTime').textContent = fmtTime(g.time);
+  $('resCauseK').style.display = $('resCause').style.display = ok ? 'none' : '';
+  $('resCause').textContent = g.deathCause || '-';
+  $('logBox').textContent = `[이번 판 로그 #${run.run}]\n` + g.log.map(e => `${e.time}  ${e.msg}`).join('\n') +
+    traceText(g) + `\n\n[세션 요약]\n` + SESSION.runs.filter(r => r.result).map(r => `#${r.run} R${r.round || 1} ${r.result.outcome} ${r.result.score}점 ${r.result.time}`).join('\n');
+  $('copyMsg').textContent = '';
+  $('resultScreen').classList.remove('hidden');
+  updateHUD();
+}
+
+function sessionText() {
+  return SESSION.runs.map(r => `=== #${r.run} R${r.round || 1} ${r.result ? `${r.result.outcome} ${r.result.score}점 ${r.result.time}` : '(진행 중)'} ===\n` +
+    r.log.map(e => `${e.time}\t${e.type}\t위험${e.level}\t${e.msg}`).join('\n')).join('\n\n');
+}
+
+// ---- 아이콘 (SVG, 외부 이미지 없음) ----
+const PX = { k:'#0a1416', d:'#143034', t:'#2f6168', T:'#4a8c93', g:'#7a5410', G:'#f2c14e', Y:'#ffe9b0',
+  o:'#c9922b', r:'#ff4a3d', R:'#ff9a3c', w:'#cfe6e2', p:'#2a1830', s:'#9fb4b8', c:'#4fd1c5', n:'#8aa0a3', N:'#5d7073', B:'#7a5a2e' };
+// 16x16 픽셀 도트. '.'은 투명, 나머지 글자는 PX 팔레트 색
+const PIXELS = {
+  small: ['.....gggggg.....','...ggGGGGGGgg...','..gGGGGGGGGGGg..','.gGGYYGGGGGGGGg.','.gGYYGGGGGGGGGg.','gGGYGGGooooGGGGg',
+          'gGGGGGoo..ooGGGg','gGGGGGo....oGGGg','gGGGGGo....oGGGg','gGGGGGoo..ooGGGg','gGGGGGGooooGGGGg','.gGGGGGGGGGGGGg.',
+          '.gGGGGGGGGGGGGg.','..gGGGGGGGGGGg..','...ggGGGGGGgg...','.....gggggg.....'],
+  seal:  ['......gggg......','....ggGGGGgg....','..ggGGGGGGGGgg..','.gGGGGGGGGGGGGg.','gGGGcGGGGGGcGGGg','gGGGGcGGGGcGGGGg',
+          'gGGGGGcGGcGGGGGg','gGGGGGGccGGGGGGg','gGGGGGGccGGGGGGg','gGGGGGcGGcGGGGGg','gGGGGcGGGGcGGGGg','gGGGcGGGGGGcGGGg',
+          '.gGGGGGGGGGGGGg.','..ggGGGGGGGGgg..','....ggGGGGgg....','......gggg......'],
+  rare:  ['................','.....gggggg.....','...ggYYGGGGgg...','..gYYGGGGGGGGg..','.gYGGGGGGGGGGGg.','gGGGGGGGGGGGGGGg',
+          '.gGGGGGGGGGGGGg.','..gGGGGGGGGGGg..','...gGGGGGGGGg...','....gGGGGGGg....','.....gGGGGg.....','......gGGg......',
+          '.......gg.......','................','................','................'],
+  bag:   ['................','......kkkk......','.....k....k.....','.....k....k.....','....kkkkkkkk....','...kBBBBBBBBk...',
+          '..kBBBBBBBBBBk..','.kBBBBBBBBBBBBk.','.kBBBBGGGGBBBBk.','.kBBBGGGGGGBBBk.','.kBBBGGGGGGBBBk.','.kBBBBGGGGBBBBk.',
+          '..kBBBBBBBBBBk..','..kBBBBBBBBBBk..','...kkkkkkkkkk...','................'],
+  warn:  ['................','.......RR.......','.......RR.......','......RRRR......','......RkkR......','.....RRkkRR.....',
+          '.....RRkkRR.....','....RRRkkRRR....','....RRRkkRRR....','...RRRRkkRRRR...','...RRRRRRRRRR...','..RRRRRkkRRRRR..',
+          '..RRRRRRRRRRRR..','.RRRRRRRRRRRRRR.','RRRRRRRRRRRRRRRR','................'],
+  hourglass:['................','..wwwwwwwwwwww..','..wwwwwwwwwwww..','...RRRRRRRRRR...','....RRRRRRRR....','.....RRRRRR.....',
+          '......RRRR......','.......RR.......','.......RR.......','......RRRR......','.....RRRRRR.....','....RRRRRRRR....',
+          '...RRRRRRRRRR...','..wwwwwwwwwwww..','..wwwwwwwwwwww..','................'],
+  clock: ['................','......kkkk......','....kkwwwwkk....','...kwwwwwwwwk...','..kwwwwwwwwwwk..','..kwwwwkwwwwwk..',
+          '.kwwwwwkwwwwwwk.','.kwwwwwkwwwwwwk.','.kwwwwwkkkwwwwk.','.kwwwwwwwwwwwwk.','..kwwwwwwwwwwk..','..kwwwwwwwwwwk..',
+          '...kwwwwwwwwk...','....kkwwwwkk....','......kkkk......','................'],
+  star:  ['................','.......GG.......','.......GG.......','......GGGG......','......GGGG......','.GGGGGGGGGGGGGG.',
+          '.GGGGGGGGGGGGGG.','..GGGGGGGGGGGG..','...GGGGGGGGGG...','....GGGGGGGG....','....GGGGGGGG....','...GGGG..GGGG...',
+          '..GGGG....GGGG..','..GGG......GGG..','................','................'],
+  flashlight:['................','................','..............YY','.............YYY','............YYYY','.....kkkkk..YYYY',
+          '....ksssssk.YYYY','....ksssssYYYYYY','....ksssssYYYYYY','....ksssssk.YYYY','.....kkkkk..YYYY','............YYYY',
+          '.............YYY','..............YY','................','................'],
+  guardian:['................','.......pp.......','.....pppppp.....','....pppppppp....','...pppppppppp...','...pppppppppp...',
+          '...prrpppprrp...','...prrpppprrp...','...pppppppppp...','..pppppppppppp..','..pppppppppppp..','..pppppppppppp..',
+          '..pppppppppppp..','..pppppppppppp..','..pppppppppppp..','................'],
+  collapse:['................','...nnnn.........','..nnnnnn........','..nnnnnn....NN..','...nnnn....NNNN.','...........NNNN.',
+          '............NN..','................','......nnnn......','.....nnnnnn.....','.....nnnnnn.....','......nnnn......',
+          '................','..NNNN..........','.NNNNNN.........','..NNNN..........'],
+  exit:  ['................','.....cccccc.....','...cc......cc...','..c..cccccc..c..','..c.cc....cc.c..','.c..c..cc..c..c.',
+          '.c.c..cccc..c.c.','.c.c..cccc..c.c.','.c.c..cccc..c.c.','.c..c..cc..c..c.','..c.cc....cc.c..','..c..cccccc..c..',
+          '...cc......cc...','.....cccccc.....','................','................'],
+  mouseL:['................','.....kkkkkk.....','...kkGGGkwwkk...','...kGGGGkwwwk...','...kGGGGkwwwk...','...kGGGGkwwwk...',
+          '...kkkkkkkkkk...','...kwwwwwwwwk...','...kwwwwwwwwk...','...kwwwwwwwwk...','...kwwwwwwwwk...','...kwwwwwwwwk...',
+          '...kwwwwwwwwk...','....kwwwwwwk....','.....kkkkkk.....','................'],
+  mouseR:['................','.....kkkkkk.....','...kkwwkGGGkk...','...kwwwkGGGGk...','...kwwwkGGGGk...','...kwwwkGGGGk...',
+          '...kkkkkkkkkk...','...kwwwwwwwwk...','...kwwwwwwwwk...','...kwwwwwwwwk...','...kwwwwwwwwk...','...kwwwwwwwwk...',
+          '...kwwwwwwwwk...','....kwwwwwwk....','.....kkkkkk.....','................'],
+};
+// 같은 색이 이어지면 하나의 사각형으로 합쳐서 SVG를 작게 만든다
+function pixSvg(rows, pal) {
+  const P = pal ? { ...PX, ...pal } : PX;
+  let out = '<svg viewBox="0 0 16 16" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">';
+  rows.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      const ch = row[x];
+      if (ch === '.' || !P[ch]) { x++; continue; }
+      let w = 1;
+      while (x + w < row.length && row[x + w] === ch) w++;
+      out += `<rect x="${x}" y="${y}" width="${w}" height="1" fill="${P[ch]}"/>`;
+      x += w;
+    }
+  });
+  return out + '</svg>';
+}
+PIXELS.torch = ['................','.......RR.......','......RRRR......','.....RRYYRR.....','.....RYYYYR.....','....RRYYYYRR....','....RRYYYYRR....','.....RRYYRR.....',
+  '......RRRR......','......kBBk......','.......BB.......','.......BB.......','.......BB.......','.......BB.......','.......BB.......','................'];
+PIXELS.crown = ['................','................','..gg...gg...gg..','.gGGg.gGGg.gGGg.','.gGGg.gGGg.gGGg.','.gGGGggGGggGGGg.','.gGYGGGGGGGGGGg.',
+  '.gGYGGGGGGGGGGg.','.gGGGGGGGGGGGGg.','.goooooooooooog.','.gGGrGGGrGGGrGg.','.gGGGGGGGGGGGGg.','..gggggggggggg..','................','................','................'];
+const PALS = { bronze:{ G:'#c98a4a', g:'#5a3416', o:'#8f5a2a', Y:'#f0cfa0' }, violet:{ G:'#a98aff', g:'#3e2a7a', c:'#efe6ff', Y:'#e6dcff', o:'#6a4cc0' } };
+const ICONS = {};
+for (const k in PIXELS) ICONS[k] = pixSvg(PIXELS[k]);
+
+const ICON = n => ICONS[n] || '';
+const RICON = {};
+function relicIcon(rl) { const k = rl.id; return RICON[k] || (RICON[k] = pixSvg(PIXELS[rl.shape || rl.id] || PIXELS.rare, PALS[rl.pal])); }
+function gradeMarks(rl) { const gr = CONFIG.grades[rl.grade]; return gr ? `<span class="gm g-${rl.grade}" title="${gr.name} 등급">${'◆'.repeat(gr.mark)}</span>` : ''; }
+function fillIcons() { document.querySelectorAll('[data-ic]').forEach(el => { el.innerHTML = ICON(el.dataset.ic); }); }
+
+function slotState(g, rl) {
+  const carried = g.carried.includes(rl);
+  if (carried) return g.state === 'escaped' ? 'secured' : 'carried';
+  if (rl.protect && g.shard === 'broken') return 'broken';
+  if (rl.thrown) return 'dropped';
+  if (g.state === 'dead' && rl.everTaken) return 'lost';
+  if (rl.seen) return 'seen';
+  return 'unknown';
+}
+
+// 유물 사용법 한 줄: 가장 값싼 유물은 미끼, 방어 유물은 자동 방어, 가장 비싼 유물은 고득점
+function relicUse(rl, list) {
+  if (rl.protect) return `함정·수호자 피해를 한 번 막고 깨짐(자동). 던지면 방어를 잃음`;
+  if (rl.rings) return `들고 있으면 ${rl.rings.every}초마다 울려 수호자를 부름. 던지면 떨어진 자리에서 울려 미끼가 됨 (−${rl.value}점, 다시 주울 수 있음)`;
+  return `고득점. 주울수록 붕괴 시간이 ${CONFIG.collapse.perRelicCut}초씩 줄어듦`;
+}
+function relicHint(rl, n) {
+  if (rl.protect) return `${rl.name}: 함정·수호자를 한 번 막아 줍니다 (자동)`;
+  if (rl.rings) return `${rl.name}: 들고 있으면 울려서 위치가 샙니다. 수호자가 오면 [${n}]·우클릭으로 던져 미끼로 쓰세요`;
+  return `${rl.name}: 고득점이지만 붕괴 시간이 줄었어요. 서둘러 돌아가세요`;
+}
+function slotsHTML(g) {
+  const list = g.relics.slice().sort((a, b) => a.value - b.value);
+  return list.map(rl => {
+    const st = slotState(g, rl), known = st !== 'unknown', short = rl.protect ? '방어 1회' : '점수';
+    const SUB = { unknown: '아직 못 찾음', seen: `${rl.value}점 · ${short}`, carried: `[${list.indexOf(rl) + 1}] 던지기${rl.protect ? ' (2번 눌러 확정)' : ''}`, dropped: '떨어짐 · 회수 가능', broken: '깨짐', lost: '잃음', secured: `+${rl.value}점` };
+    const title = known ? `${rl.name} — ${rl.effect}` : '아직 발견하지 못한 유물';
+    return `<div class="slot ${st}" title="${title}"><span class="kb">${list.indexOf(rl) + 1}</span><div class="ico">${relicIcon(rl)}</div><div><div class="nm">${known ? rl.name + gradeMarks(rl) : '???'}</div><div class="sub">${SUB[st]}</div></div></div>`;
+  }).join('');
+}
+
+function updateSlots() {
+  const g = game; if (!g) return;
+  const sig = g.relics.map(rl => slotState(g, rl)).join('|') + g.state;
+  if (sig === slotSig) return;
+  slotSig = sig;
+  $('slots').innerHTML = slotsHTML(g);
+}
+
+function traceText(g) {
+  if (!g.trace || !g.trace.length) return '';
+  const near = g.trace.filter(e => e.dist <= 8);
+  return `\n\n[수호자 기록 — 1초 간격, 거리 8칸 이내만 표시 · 판 전체 최소 거리 ${g.minGuardDist === null ? '-' : g.minGuardDist.toFixed(1) + '칸'}]\n` +
+    (near.length ? near.map(e => `${fmtTime(e.t)}  거리 ${e.dist}칸 · ${e.state} · 목표 ${e.target}${e.changed ? '(바뀜)' : ''} · 내 위치 ${e.zone}`).join('\n') : '(8칸 안으로 다가온 적 없음)');
+}
+function updateHUD() {
+  updateSlots();
+  const g = game; if (!g) return;
+  $('hudCount').textContent = g.carried.length;
+  $('hudScore').textContent = escapeScore(g) + (greedMult(g) > 1 ? ` (×${greedMult(g)})` : '');
+  const mx = maxLevel(CONFIG);
+  $('hudPips').innerHTML = Array.from({ length: mx }, (_, i) => `<span class="pip ${i < g.level ? 'on' + Math.min(3, i + 1) : ''}"></span>`).join('');
+  const sh = $('shardState');
+  sh.textContent = g.shard === 'held' ? '방어 1회' : g.shard === 'broken' ? '깨짐' : '—';
+  sh.className = g.shard;
+  const hl = $('hudLight'), fu = Math.ceil(g.fuel);
+  hl.textContent = g.lighting > 0 ? '켜는 중…' : g.light ? `켬 ${fu}초` : g.fuel <= 0 ? '기름 없음' : `꺼짐 ${fu}초`;
+  hl.style.color = g.fuel <= 0 ? 'var(--danger)' : g.fuel < 8 ? 'var(--warn)' : g.light ? 'var(--gold)' : 'var(--dim)';
+  $('hudTime').textContent = fmtTime(g.time).slice(0, 5);
+  const hc = $('hudCollapse'), col = g.collapse, bar = $('collapseBar');
+  hc.textContent = col.active ? Math.ceil(col.remaining) : '—';
+  hc.className = col.active ? (col.remaining <= 30 ? 'crit' : 'on') : '';
+  bar.firstElementChild.style.width = (col.active ? Math.max(0, Math.min(1, col.remaining / (game ? game.cfg : CONFIG).collapse.startTime)) * 100 : 0) + '%';
+  bar.className = 'bar' + (col.active && col.remaining <= 30 ? ' crit' : '');
+  $('hudBest').textContent = SESSION.best;
+}
+
+function updateTip() {
+  const tip = $('tip'), g = game;
+  if (screen !== 'play' || !g) { tip.style.display = 'none'; return; }
+  const rl = relicNear(g, CONFIG.tipRange);
+  if (rl && rl.seen) {
+    const can = relicNear(g, CONFIG.interactRange) === rl;
+    const risk = rl.everTaken ? '' : ' <span style="color:var(--warn)">위험 ▲ 붕괴 ▼</span>';
+    tip.innerHTML = `<span class="tipico">${relicIcon(rl)}</span><b>${rl.name}</b>${gradeMarks(rl)} ${rl.value}점${rl.protect ? ' · 방어 1회' : ''}${risk}<br>` +
+      (can ? '<span class="key">클릭</span>' + (rl.everTaken ? '회수' : '줍기') : '<span style="color:var(--dim)">더 가까이</span>');
+    tip.style.display = 'block';
+  } else if (atExit(g)) {
+    // 입구에서의 선택: 지금 확정할 점수와, 하나 더 들고 왔을 때의 배율을 나란히 보여준다
+    const n = g.carried.length, left = g.relics.filter(r => !r.taken).length, m = greedMult(g), m2 = greedMult(g, n + 1);
+    let more = '';
+    if (!n) more = ' <span style="color:var(--dim)">(빈손)</span>';
+    else if (left && m2 > m) more = `<br><span style="color:var(--warn)">하나 더 들고 오면 ×${m2}</span> <span style="color:var(--dim)">· 붕괴 ${g.collapse.active ? Math.ceil(g.collapse.remaining) + '초' : '전'}</span>`;
+    else if (m > 1) more = ` <span style="color:var(--dim)">(${carriedScore(g)} × ${m})</span>`;
+    tip.innerHTML = `<span class="tipico">${ICON('exit')}</span><span class="key">클릭</span>탈출 · 확정 <b>${escapeScore(g)}점</b>` + more;
+    tip.style.display = 'block';
+    if (n && left && !g.hinted.greed) { g.hinted.greed = true; toast(`지금 나가면 ${escapeScore(g)}점 확정 — 더 들어가면 배율이 오르지만 수호자도 빨라진다`, 'gold', 3400); }
+  } else tip.style.display = 'none';
+}
+
+// ---------------- 렌더링 ----------------
+function hash(r, c) { let h = (r * 73856093) ^ (c * 19349663); h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967295; }
+
+// ---- 던전 분위기: 12x12 도트 타일을 미리 그려 두고 쓴다 (T=36 → 도트 1개 = 3px) ----
+// 밝기·색은 여기서만 조정. 함정 경고색·유물색은 바닥보다 충분히 밝게 유지(대비 5 이상)할 것.
+const MOOD = {
+  floor:'#2b3a3e', floorHi:'#324449', floorMortar:'#1a2528', floorSpeck:'#384a50', floorDark:'#222e32', moss:'#34503a', mossDark:'#243a2b',
+  wallFace:'#566a78', wallFace2:'#4a5d6a', wallHi:'#7e95a6', wallDark:'#1b242b', wallMortar:'#141b21',
+  wallTop:'#475a6b', wallTopSpeck:'#3e4f5e', wallRim:'#6a7f8f',
+  litDark:0.55,            // 시야 안 타일 위에 덮는 어둠(0~1)
+  memDark:0.8,             // 기억만 남은 타일 위에 덮는 어둠 (횃불 켰을 때)
+  memDarkOff:0.94,         // 횃불을 껐을 때 기억 타일의 어둠 — 거의 안 보이게. 지나온 길이 환하면 어둠이 무섭지 않다
+  lantern:'255,208,130',   // 랜턴 빛 색(RGB)
+  ambient:'150,160,150',   // 몸 주변 작은 빛
+  flicker:0.09,            // 랜턴 깜빡임 세기
+  motes:16,                // 떠다니는 먼지 개수
+};
+const TA = 12, TP = T / TA;
+function tcv() { const e = document.createElement('canvas'); e.width = e.height = T; return e; }
+function ppx(c, x, y, col, w = 1, h = 1) { c.fillStyle = col; c.fillRect(x * TP, y * TP, w * TP, h * TP); }
+const tileCache = {};
+function buildFloor(v, nShade, wShade) {
+  const e = tcv(), c = e.getContext('2d'), R = seededRng(900 + v * 131), M = MOOD;
+  ppx(c, 0, 0, M.floor, TA, TA);
+  // 큰 판석: 타일 하나가 돌판 한 장. 가장자리 이음선만 옅게(벽돌 줄눈과 모양이 달라야 구분이 쉬움)
+  ppx(c, 0, 0, M.floorMortar, TA, 1); ppx(c, 0, 0, M.floorMortar, 1, TA);
+  ppx(c, 1, 1, M.floorHi, TA - 2, 1); ppx(c, 1, 1, M.floorHi, 1, TA - 2);
+  for (let i = 0; i < 8; i++) ppx(c, 2 + Math.floor(R() * 9), 2 + Math.floor(R() * 9), i % 2 ? M.floorSpeck : M.floorDark);
+  if (v % 4 === 1) { let x = 3 + Math.floor(R() * 5), y = 2; for (let i = 0; i < 6; i++) { ppx(c, x, y, M.floorMortar); y++; if (i % 2) x++; } }
+  if (v % 4 === 3) { const x = 6 + Math.floor(R() * 4), y = 6 + Math.floor(R() * 4); ppx(c, x, y, M.moss); ppx(c, x + 1, y, M.moss); ppx(c, x, y + 1, M.mossDark); ppx(c, x - 1, y + 1, M.moss); }
+  if (nShade) { c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(0, 0, T, 2 * TP); c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(0, 2 * TP, T, 2 * TP); }
+  if (wShade) { c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(0, 0, 2 * TP, T); }
+  return e;
+}
+function buildWallFace(v) {
+  const e = tcv(), c = e.getContext('2d'), R = seededRng(500 + v * 97), M = MOOD;
+  ppx(c, 0, 0, M.wallFace, TA, TA);
+  const rows = [[0, 3], [4, 3], [8, 3]];   // 벽돌 3줄(세로 3칸) — 줄 사이는 회반죽 선
+  rows.forEach(([y0, h], i) => {
+    const off = (i + v) % 2 ? 2 : 5;
+    for (let b = 0; b < 2; b++) { const bx = b ? off + 1 : 0, bw = b ? TA - off - 1 : off; if (R() > 0.45) ppx(c, bx, y0, M.wallFace2, bw, h - 1); }
+    ppx(c, off, y0, M.wallMortar, 1, h);
+  });
+  [3, 7].forEach(y => ppx(c, 0, y, M.wallMortar, TA, 1));
+  ppx(c, 0, 0, M.wallHi, TA, 1);                         // 윗면 모서리 하이라이트
+  ppx(c, 0, 10, M.wallDark, TA, 2);                      // 아래 그늘
+  if (v % 3 === 2) { ppx(c, 3, 1, M.moss); ppx(c, 4, 1, M.mossDark); ppx(c, 8, 2, M.moss); }
+  return e;
+}
+function buildWallTop(v, mask) {   // mask: 1=위쪽, 2=왼쪽, 4=오른쪽이 바닥 → 그쪽 가장자리를 밝혀 경계를 보이게
+  const e = tcv(), c = e.getContext('2d'), R = seededRng(300 + v * 57), M = MOOD;
+  ppx(c, 0, 0, M.wallTop, TA, TA);
+  [[0, 3], [4, 3], [8, 3]].forEach(([y0, h], i) => {   // 벽 옆면과 같은 벽돌, 다만 윗면이라 한 단계 어둡게
+    const off = (i + v) % 2 ? 2 : 5;
+    for (let k = 0; k < 2; k++) { const bx = k ? off + 1 : 0, bw = k ? TA - off - 1 : off; if (R() > 0.45) ppx(c, bx, y0, M.wallTopSpeck, bw, h); }
+    ppx(c, off, y0, M.wallMortar, 1, h);
+  });
+  [3, 7, 11].forEach(y => ppx(c, 0, y, M.wallMortar, TA, 1));
+  if (mask & 1) ppx(c, 0, 0, M.wallRim, TA, 1);
+  if (mask & 2) ppx(c, 0, 0, M.wallRim, 1, TA);
+  if (mask & 4) ppx(c, TA - 1, 0, M.wallRim, 1, TA);
+  return e;
+}
+function tileImage(g, r, c) {
+  const isWall = (rr, cc) => rr < 0 || cc < 0 || rr >= g.rows || cc >= g.cols || g.grid[rr][cc] === 1;
+  if (g.grid[r][c]) {
+    if (!isWall(r + 1, c)) { const v = Math.floor(hash(r, c) * 3), k = 'wf' + v; return tileCache[k] || (tileCache[k] = buildWallFace(v)); }
+    const m = (!isWall(r - 1, c) ? 1 : 0) | (!isWall(r, c - 1) ? 2 : 0) | (!isWall(r, c + 1) ? 4 : 0), v = Math.floor(hash(c, r) * 2), k = 'wt' + v + '_' + m;
+    return tileCache[k] || (tileCache[k] = buildWallTop(v, m));
+  }
+  const n = isWall(r - 1, c) ? 1 : 0, w = isWall(r, c - 1) ? 1 : 0, v = Math.floor(hash(r + 3, c + 5) * 4), k = 'fl' + v + '_' + n + w;
+  return tileCache[k] || (tileCache[k] = buildFloor(v, n, w));
+}
+function drawTile(r, c, g) { ctx.drawImage(tileImage(g, r, c), c * T, r * T); }
+
+// ---- 월드 도트 스프라이트 ----
+Object.assign(PX, { e:'#e0b890', m:'#8a2a2a', M:'#c04040', b:'#a07840', P:'#4a2f63', u:'#3b66c9', U:'#6a95f0', v:'#24408a' });
+function pixCanvas(rows, scale, pal) {
+  const P = pal ? { ...PX, ...pal } : PX, w = rows[0].length, h = rows.length;
+  const e = document.createElement('canvas'); e.width = w * scale; e.height = h * scale; const c = e.getContext('2d');
+  rows.forEach((row, y) => { for (let x = 0; x < w; x++) { const ch = row[x]; if (ch !== '.' && P[ch]) { c.fillStyle = P[ch]; c.fillRect(x * scale, y * scale, scale, scale); } } });
+  return e;
+}
+const SPR = {};
+const spr = (key, fn) => SPR[key] || (SPR[key] = fn());
+const mir = h => h.map(r => r + [...r].reverse().join(''));   // 좌우 대칭 도트는 왼쪽 절반만 적는다
+const W_PAL = { k:'#06080f', h:'#1b2236', H:'#33436b', f:'#d9a37a', s:'#3a2530', A:'#8defff', a:'#2aa6dc', c:'#1f6f9c', o:'#b5382f', Y:'#f2c14e', l:'#151a2b', L:'#27324f', x:'#5a3a28', q:'#1e6e94', w:'#eafcff' };
+const W_ROWS = {
+  down: mir(["...kk", "..khh", "..kAs", "..khf", ".kcca", "kcAaa", "kfkaa", ".kkoY", ".klLa", "..klL"]),
+  up:   mir(["...kk", "..khh", "..khH", "..khh", ".kcll", "kcAlL", "kfklL", ".kkoo", ".kllL", "..klL"]),
+  side: ["..kkkk....", ".khhhhk...", ".khhhsfk..", ".khhhAfk..", ".kkhhffk..", "..kcckk...", "..klkcAk..", "..klkaakfk", "..klkook..", "..klLaLk.."],
+};
+const W_LEGS = { down: [[".kxk..kxk.", ".kkk..kkk."], ["kxk....kxk", "kkk....kkk"]], side: [["..kxxxk...", "..kkkkk..."], ["..kxk.kxk.", "..kkk.kkk."]] };
+W_LEGS.up = W_LEGS.down;
+const SHIELD_ROWS = ["kkkkk", "kcYck", "kccck", ".kck.", "..k.."], LANT_ROWS = [["..k..", ".kkk.", "kYRYk", "kRYRk", "kYRYk", ".kkk."], ["..k..", ".kkk.", "kRYRk", "kYRYk", "kRYRk", ".kkk."]], GUARD_ROWS = mir(["H.....", "HH....", "..kppp", "..kpEp", "..kppp", "...kpp", ".kkPPp", "kpPPpp", "kp.ppp", "kp.Ppp", "kk.ppp", "...kpp", "..kppP", "..kppp", ".kpp.p", ".k.kp."]);
+const GUARD_PAL = {   // 도감 카드의 수호자 아이콘과 같은 모양. 상태는 색으로만 구분
+  dormant:     { p:'#46505c', r:'#7a8896', rim:'#6d7b8a' },
+  patrol:      { p:'#3a2350', r:'#ff4a3d', rim:'#7d5ca8' },
+  alert:       { p:'#3a2350', r:'#ffb347', rim:'#c0873a' },
+  investigate: { p:'#3a2350', r:'#ff1a1a', rim:'#b04040' },
+  stunned:     { p:'#3a3f45', r:'#8899aa', rim:'#79848e' },
+};
+function outlinePx(src, color, d) {   // 어두운 바닥에서도 읽히도록 한 칸 두께의 밝은 테두리
+  const e = document.createElement('canvas'); e.width = src.width + 2 * d; e.height = src.height + 2 * d; const c = e.getContext('2d');
+  const t = document.createElement('canvas'); t.width = src.width; t.height = src.height; const tc = t.getContext('2d');
+  tc.drawImage(src, 0, 0); tc.globalCompositeOperation = 'source-in'; tc.fillStyle = color; tc.fillRect(0, 0, t.width, t.height);
+  for (const [ox, oy] of [[-d, 0], [d, 0], [0, -d], [0, d]]) c.drawImage(t, d + ox, d + oy);
+  c.drawImage(src, d, d); return e;
+}
+const IMG = c => { ctx.imageSmoothingEnabled = false; return c; };
+
+// ---- 함정: 12x12 도트(타일 크기). 상태별로 미리 그려 둠 ----
+function trapSprite(state) {
+  return spr('trap_' + state, () => {
+    const e = tcv(), c = e.getContext('2d');
+    const plate = state === 'active' ? '#7a2a24' : state === 'rest' ? '#2a1c1c' : state === 'warn' ? '#3a1a1a' : '#1a2a2b';
+    const edge = state === 'warn' ? '#b02a24' : state === 'active' ? '#ff4a3d' : '#3c5556';   // 경고도 빨강 계열: 유물(금색)과 같은 문법을 쓰지 않는다
+    ppx(c, 1, 1, plate, 10, 10);
+    ppx(c, 1, 1, edge, 10, 1); ppx(c, 1, 10, edge, 10, 1); ppx(c, 1, 1, edge, 1, 10); ppx(c, 10, 1, edge, 1, 10);
+    const holes = [[2, 2], [8, 2], [2, 8], [8, 8], [5, 5]];
+    for (const [hx, hy] of holes) {
+      ppx(c, hx, hy, '#071011', 2, 2);
+      if (state === 'warn') ppx(c, hx, hy, '#ff4a3d', 1, 1);
+      if (state === 'active') { ppx(c, hx, hy - 2, '#ffe0d8', 2, 3); ppx(c, hx, hy - 3, '#ffffff', 1, 1); }
+    }
+    return e;
+  });
+}
+function drawTrap(tr, vis, now) {
+  const x = tr.c * T, y = tr.r * T, cx = x + T / 2, cy = y + T / 2;
+  IMG(0); ctx.drawImage(trapSprite(vis ? tr.state : 'idle'), x, y);
+  if (!vis) return; // 시야 밖: 작동 상태 숨김
+  if (tr.state === 'warn') {
+    // 경고: 바닥이 흔들리며 빨간 금이 벌어진다 (느낌표·게이지 없음 — 보상처럼 보이지 않게)
+    const prog = 1 - tr.t / CONFIG.trap.warn, pulse = 0.5 + 0.5 * Math.sin(now * 18);
+    const id = tr.idx == null ? (tr.i || 0) : tr.idx;   // 타이틀 연출의 함정은 idx 대신 i를 쓴다
+    const jx = Math.round(Math.sin(now * 41 + id) * 1.5), jy = Math.round(Math.cos(now * 37 + id) * 1.5);
+    ctx.fillStyle = `rgba(255,50,40,${0.12 + 0.28 * pulse})`; ctx.fillRect(x + 2 + jx, y + 2 + jy, T - 4, T - 4);
+    const R = seededRng(id * 31 + 7);
+    ctx.strokeStyle = `rgba(255,74,61,${0.6 + 0.4 * prog})`; ctx.lineWidth = 1.5 + prog; ctx.beginPath();
+    for (let i = 0; i < 4; i++) { let px = cx + jx, py = cy + jy; ctx.moveTo(px, py); for (let k = 0; k < 3; k++) { px += (R() - 0.5) * 16 * (0.4 + prog); py += (R() - 0.5) * 16 * (0.4 + prog); ctx.lineTo(Math.round(px), Math.round(py)); } }
+    ctx.stroke();
+  } else if (tr.state === 'active') {
+    const grd = ctx.createRadialGradient(cx, cy, 2, cx, cy, T * 0.8);
+    grd.addColorStop(0, 'rgba(255,90,60,.7)'); grd.addColorStop(1, 'rgba(255,40,30,0)');
+    ctx.fillStyle = grd; ctx.fillRect(x - T / 2, y - T / 2, T * 2, T * 2);
+    ctx.drawImage(trapSprite('active'), x, y);
+  }
+}
+
+function relicSprite(rl) { return spr('relic_' + rl.id, () => pixCanvas(PIXELS[rl.shape || rl.id] || PIXELS.rare, 1, PALS[rl.pal])); }
+function drawRelic(rl, vis, now) {
+  const cx = rl.c * T + T / 2, cy = rl.r * T + T / 2, bob = Math.round(Math.sin(now * 2.5 + rl.c) * 1.5) * 2;
+  if (vis) {
+    const grd = ctx.createRadialGradient(cx, cy, 2, cx, cy, T * 0.6);
+    grd.addColorStop(0, 'rgba(242,193,78,.5)'); grd.addColorStop(1, 'rgba(242,193,78,0)');
+    ctx.fillStyle = grd; ctx.fillRect(cx - T * 0.6, cy - T * 0.6, T * 1.2, T * 1.2);
+    // 세로 빛 기둥: 보상은 위로 솟는 금빛, 함정은 바닥에 갈라지는 빨강 — 형태로 구분
+    const ph = 0.5 + 0.5 * Math.sin(now * 2 + rl.c), pg = ctx.createLinearGradient(0, cy - T * 1.7, 0, cy + 6);
+    pg.addColorStop(0, 'rgba(242,193,78,0)'); pg.addColorStop(1, `rgba(242,193,78,${0.22 + 0.18 * ph})`);
+    ctx.fillStyle = pg; ctx.fillRect(cx - 5, cy - T * 1.7, 10, T * 1.7 + 6);
+  }
+  ctx.globalAlpha = vis ? 1 : 0.35;
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(Math.round(cx - 5), Math.round(cy + 7), 10, 2);   // 바닥 그림자
+  ctx.drawImage(IMG(relicSprite(rl)), Math.round(cx - 8), Math.round(cy - 8 + bob));
+  if (vis && Math.floor(now * 3 + rl.c) % 3 === 0) { ctx.fillStyle = '#fff'; const sx = Math.round(cx + 5), sy = Math.round(cy - 7 + bob); ctx.fillRect(sx - 1, sy - 3, 2, 6); ctx.fillRect(sx - 3, sy - 1, 6, 2); }   // 반짝임
+  ctx.globalAlpha = 1;
+}
+
+function drawGuard(gd, now) {
+  const cx = Math.round(gd.x * T), cy = Math.round(gd.y * T), st = gd.state;
+  const awake = st === 'patrol' || st === 'investigate' || st === 'alert';
+  if (awake) { const grd = ctx.createRadialGradient(cx, cy, 4, cx, cy, T * 0.9); grd.addColorStop(0, 'rgba(255,60,60,.28)'); grd.addColorStop(1, 'rgba(255,60,60,0)'); ctx.fillStyle = grd; ctx.fillRect(cx - T, cy - T, T * 2, T * 2); }
+  if (gd.grab != null) {   // 손을 뻗는 중: 붉은 원이 빠르게 커진다 — 이 안에서 벗어나야 산다
+    const k = 1 - gd.grab / CONFIG.guard.grabTime, R = CONFIG.guard.grabRange * T;
+    ctx.strokeStyle = `rgba(255,74,61,${0.5 + 0.5 * k})`; ctx.lineWidth = 2 + 2 * k; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.arc(cx, cy, R * (0.5 + 0.5 * k), 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const bob = awake && gd.moving && Math.floor(now * 7) % 2 ? -TP : 0;
+  const img = spr('guard_' + st, () => outlinePx(pixCanvas(PIXELS.guardian, TP, GUARD_PAL[st] || GUARD_PAL.patrol), (GUARD_PAL[st] || GUARD_PAL.patrol).rim, TP));
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(cx - 12, cy + 10, 24, 4);
+  const flip = Math.cos(gd.dir) < -0.3;
+  ctx.save(); ctx.translate(cx, cy - 12 * TP + bob); if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(IMG(img), -img.width / 2, 0); ctx.restore();
+  if (st === 'stunned') {   // 도트 별 두 개가 머리 위를 돈다
+    ctx.fillStyle = '#ffe9b0';
+    for (let i = 0; i < 2; i++) { const a = now * 5 + i * Math.PI, sx = Math.round(cx + Math.cos(a) * 12), sy = Math.round(cy - 40 + Math.sin(a) * 4); ctx.fillRect(sx - 1, sy - 3, 2, 6); ctx.fillRect(sx - 3, sy - 1, 6, 2); }
+  }
+}
+
+// 랜턴 위치: 몸 앞쪽 손 높이. 빛 원뿔도 여기서 시작한다
+function lanternPos(px, py, pr, aim) {
+  return { x: Math.round(px + Math.cos(aim) * pr * 0.9), y: Math.round(py + Math.sin(aim) * pr * 0.9 - 4) };
+}
+let walkLast = { x: 0, y: 0 };
+function drawPlayer(g, now, aim) {
+  const px = g.player.x * T, py = g.player.y * T, pr = T * CONFIG.playerRadius;
+  const blink = g.invuln > 0 && Math.floor(now * 14) % 2 === 0;
+  const moving = Math.hypot(px - walkLast.x, py - walkLast.y) > 0.15; walkLast = { x: px, y: py };
+  if (g.state === 'dead' || blink) return;
+  const ca = Math.cos(aim), sa = Math.sin(aim);
+  const view = Math.abs(ca) >= Math.abs(sa) ? 'side' : (sa > 0 ? 'down' : 'up'), flip = view === 'side' && ca < 0;
+  const f = moving ? Math.floor(now * 8) % 2 : 0, bob = moving && f ? -TP : 0;
+  const body = spr('w_' + view + f, () => pixCanvas(W_ROWS[view].concat(W_LEGS[view][f]), TP, W_PAL));
+  const X = Math.round(px), Y = Math.round(py);
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(X - 12, Y + 8, 24, 4);
+  if (g.shard === 'held') { ctx.strokeStyle = `rgba(79,209,197,${0.18 + 0.14 * Math.sin(now * 4)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(X, Y, pr * 1.7, 0, 7); ctx.stroke(); }
+    ctx.save(); ctx.translate(X, Y - 8 * TP + bob); if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(IMG(body), -5 * TP, 0);
+  if (g.shard === 'held') { const sh = spr('shield', () => pixCanvas(SHIELD_ROWS, TP)); ctx.drawImage(IMG(sh), (view === 'side' ? -1 : -2) * TP, 6 * TP); }   // 봉인의 조각: 방패가 몸에 나타남
+  ctx.restore();
+}
+
+function drawEntrance(sx, sy, now) {
+  const icon = spr('exit', () => pixCanvas(PIXELS.exit, 2)), pulse = 0.65 + 0.25 * Math.sin(now * 3);
+  const grd = ctx.createRadialGradient(sx, sy, 2, sx, sy, T); grd.addColorStop(0, `rgba(79,209,197,${0.28 * pulse})`); grd.addColorStop(1, 'rgba(79,209,197,0)');
+  ctx.fillStyle = grd; ctx.fillRect(sx - T, sy - T, T * 2, T * 2);
+  ctx.globalAlpha = pulse + 0.2; ctx.drawImage(IMG(icon), Math.round(sx - 16), Math.round(sy - 16)); ctx.globalAlpha = 1;
+}
+
+function drawMinimap(g) {
+  const s = 4, w = g.cols * s, h = g.rows * s, x0 = cv.width - w - 16, y0 = 16;
+  // 픽셀 프레임: 바깥 어두운 테두리 → 청록 테두리 → 안쪽 패널
+  ctx.fillStyle = '#0a1416'; ctx.fillRect(x0 - 9, y0 - 9, w + 18, h + 18);
+  ctx.fillStyle = '#2d5156'; ctx.fillRect(x0 - 6, y0 - 6, w + 12, h + 12);
+  ctx.fillStyle = 'rgba(4,10,11,.88)'; ctx.fillRect(x0 - 3, y0 - 3, w + 6, h + 6);
+  ctx.fillStyle = '#0a1416';   // 모서리 노치
+  for (const [ox, oy] of [[-9, -9], [w + 5, -9], [-9, h + 5], [w + 5, h + 5]]) ctx.fillRect(x0 + ox, y0 + oy, 4, 4);
+  for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
+    if (!g.seen[r][c]) continue;
+    ctx.fillStyle = g.grid[r][c] ? '#16363a' : '#3f8a86'; ctx.fillRect(x0 + c * s, y0 + r * s, s, s);
+  }
+  ctx.strokeStyle = '#4fd1c5'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x0 + (g.start.c + 0.5) * s, y0 + (g.start.r + 0.5) * s, 3.2, 0, 7); ctx.stroke();
+  for (const rl of g.relics) if (!rl.taken && rl.seen) { ctx.fillStyle = rl.thrown ? '#ff9a3c' : '#f2c14e'; ctx.fillRect(x0 + (rl.c + 0.5) * s - 2, y0 + (rl.r + 0.5) * s - 2, 4, 4); }
+  for (const gd of g.guards) if (g.visible[Math.floor(gd.y)][Math.floor(gd.x)] > 0) { ctx.fillStyle = '#ff4a3d'; ctx.beginPath(); ctx.arc(x0 + gd.x * s, y0 + gd.y * s, 2.6, 0, 7); ctx.fill(); }
+  const pxm = x0 + g.player.x * s, pym = y0 + g.player.y * s;
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(pxm, pym, 2.6, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1; ctx.strokeRect(x0 + cam.x / T * s, y0 + cam.y / T * s, cv.width / ZOOM / T * s, cv.height / ZOOM / T * s);
+}
+
+// 떠다니는 먼지: 화면 위에 아주 옅게. 분위기용이라 게임 정보와 무관
+const LIGHT = {};
+const motes = Array.from({ length: 24 }, (_, i) => ({ x: (i * 97) % 900, y: (i * 61) % 600, s: 0.6 + (i % 5) * 0.25, p: i * 1.7 }));
+function drawMotes(now) {
+  for (let i = 0; i < Math.min(MOOD.motes, motes.length); i++) {
+    const m = motes[i], x = (m.x + now * 6 * m.s + Math.sin(now * 0.7 + m.p) * 12) % 900, y = (m.y - now * 4 * m.s + 600 * 10) % 600;
+    ctx.fillStyle = `rgba(${MOOD.lantern},${0.10 + 0.07 * Math.sin(now * 1.3 + m.p)})`; ctx.fillRect(Math.round(x), Math.round(y), 2, 2);
+  }
+}
+
+// ---- 타이틀 배경: 작은 던전 한 구역에서 함정이 돌고 수호자가 걸어 다니다 함정에 걸린다 (게임 규칙을 보여 주는 연출, 실제 게임과 무관) ----
+const TITLE = (() => {
+  const map = ['##############', '#............#', '#.##.#####.##.#', '#............#', '#.##.#####.##.#', '#............#', '#.##.#####.##.#', '#............#', '#.##.#####.##.#', '#............#', '##############'];   // 안내 글이 가리지 않는 아래쪽 통로(9행)에서 연출이 벌어진다
+  const grid = map.map(r => [...r].map(ch => ch === '#' ? 1 : 0));
+  const traps = [[9, 4], [9, 7], [9, 10], [7, 2], [7, 11], [5, 6]].map(([r, c], i) => ({ r, c, state: 'idle', t: 0, i }));
+  return { rows: map.length, cols: map[0].length, grid, traps, guard: { x: 1.5, y: 9.5, dir: 0, state: 'patrol', moving: true, stun: 0, immune: 0 }, last: 0 };
+})();
+function titleUpdate(now) {
+  const D = TITLE, dt = Math.min(0.05, Math.max(0, now - D.last)); D.last = now;
+  for (const tr of D.traps) {
+    const ph = (now + tr.i * 1.1) % 4.4;
+    if (ph < 1.0) { tr.state = 'idle'; tr.t = 0; } else if (ph < 2.0) { tr.state = 'warn'; tr.t = 2.0 - ph; } else if (ph < 2.7) { tr.state = 'active'; tr.t = 2.7 - ph; } else { tr.state = 'rest'; tr.t = 4.4 - ph; }
+  }
+  const g = D.guard;
+  if (g.immune > 0) g.immune -= dt;
+  if (g.state === 'stunned') { g.stun -= dt; g.moving = false; if (g.stun <= 0) { g.state = 'patrol'; g.immune = 2.5; g.moving = true; } return; }
+  g.x += Math.cos(g.dir) * 1.5 * dt;
+  if (g.x > 12.5) { g.x = 12.5; g.dir = Math.PI; } else if (g.x < 1.5) { g.x = 1.5; g.dir = 0; }
+  const tr = D.traps.find(t => t.r === Math.floor(g.y) && t.c === Math.floor(g.x));
+  if (tr && tr.state === 'active' && g.immune <= 0) { g.state = 'stunned'; g.stun = 3.0; g.moving = false; }
+}
+function renderTitle(now) {
+  titleUpdate(now);
+  const D = TITLE, Z = 1.7, ox = (cv.width - D.cols * T * Z) / 2, oy = 548 - 9.5 * T * Z;
+  ctx.setTransform(Z, 0, 0, Z, ox, oy);
+  for (let r = 0; r < D.rows; r++) for (let c = 0; c < D.cols; c++) drawTile(r, c, D);
+  for (const tr of D.traps) drawTrap(tr, true, now);
+  drawGuard(D.guard, now);
+  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(0, 0, D.cols * T, D.rows * T);       // 전체를 어둡게
+  ctx.globalCompositeOperation = 'lighter';
+  for (const c of [3, 10]) {   // 벽 횃불이 비추는 따뜻한 빛
+    const tx = (c + 0.5) * T, ty = 8.7 * T, fl = 1 + 0.12 * Math.sin(now * 9 + c) + 0.06 * Math.sin(now * 15.3 + c * 2);
+    const gr = ctx.createRadialGradient(tx, ty, 2, tx, ty, T * 4.2 * fl); gr.addColorStop(0, `rgba(${MOOD.lantern},.42)`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = gr; ctx.fillRect(tx - T * 5, ty - T * 5, T * 10, T * 10);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  for (const c of [3, 10]) {   // 횃불 도트
+    const tx = Math.round((c + 0.5) * T), ty = Math.round(8.5 * T), f = Math.floor(now * 7 + c) % 2;
+    ctx.fillStyle = '#5a3a1c'; ctx.fillRect(tx - 3, ty, 6, 12);
+    ctx.fillStyle = '#ff9a3c'; ctx.fillRect(tx - 6, ty - 9 - f * 3, 12, 9 + f * 3);
+    ctx.fillStyle = '#ffe9b0'; ctx.fillRect(tx - 3, ty - 6 - f * 3, 6, 6 + f * 2);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawMotes(now);
+  const vg = ctx.createRadialGradient(cv.width / 2, cv.height / 2, cv.height * 0.3, cv.width / 2, cv.height / 2, cv.width * 0.62);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.7)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, cv.width, cv.height);
+}
+
+function render(now) {
+  const g = game;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#020405'; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (screen === 'start') { renderTitle(now); return; }
+  if (!g) return;
+  updateCamera(g, false);
+  const shx = shake > 0 ? (Math.random() - 0.5) * 10 * shake : 0, shy = shake > 0 ? (Math.random() - 0.5) * 10 * shake : 0;
+  ctx.setTransform(ZOOM, 0, 0, ZOOM, -cam.x * ZOOM + shx, -cam.y * ZOOM + shy);
+  const c0 = Math.max(0, Math.floor(cam.x / T) - 1), c1 = Math.min(g.cols - 1, Math.ceil((cam.x + cv.width / ZOOM) / T) + 1);
+  const r0 = Math.max(0, Math.floor(cam.y / T) - 1), r1 = Math.min(g.rows - 1, Math.ceil((cam.y + cv.height / ZOOM) / T) + 1);
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (g.seen[r][c]) drawTile(r, c, g);
+  const sx = g.start.c * T + T / 2, sy = g.start.r * T + T / 2;
+  drawEntrance(sx, sy, now);
+  const Fl = CONFIG.torch;
+  for (const tr of g.traps) if (g.seen[tr.r][tr.c]) {
+    const near = Math.hypot(tr.c + 0.5 - g.player.x, tr.r + 0.5 - g.player.y) <= Fl.warnGlowRadius;   // 가까운 함정은 손전등 밖에서도 경고가 빛남
+    drawTrap(tr, g.visible[tr.r][tr.c] > 0 || near, now);
+  }
+  for (const rl of g.relics) if (!rl.taken && rl.seen) drawRelic(rl, g.light && g.visible[rl.r][rl.c] > 0, now);
+  // 횃불 밖의 유물: 가까우면(벽에 안 가리면) 작은 반짝임만 깜빡인다 — 어둠 속 단서
+  for (const rl of g.relics) {
+    if (rl.taken || (g.light && g.visible[rl.r][rl.c] > 0)) continue;
+    const d = Math.hypot(rl.c + 0.5 - g.player.x, rl.r + 0.5 - g.player.y);
+    if (d > CONFIG.sparkleRange || !hasLOS(g, g.player.x, g.player.y, rl.c + 0.5, rl.r + 0.5)) continue;
+    if (Math.floor(now * 2 + rl.c * 0.7 + rl.r) % 4 !== 0) continue;
+    if (!g.hinted.spark && g.state === 'play') { g.hinted.spark = true; toast('어둠 속에서 무언가 반짝인다 — 가까이 가서 F로 비춰 보자. 한 번 보면 불을 꺼도 기억에 남아 주울 수 있다', 'gold', 4200); }
+    const sx = Math.round(rl.c * T + T / 2 + 3), sy = Math.round(rl.r * T + T / 2 - 4);
+    ctx.fillStyle = 'rgba(255,240,190,.9)'; ctx.fillRect(sx - 1, sy - 3, 2, 6); ctx.fillRect(sx - 3, sy - 1, 6, 2);
+  }
+  for (const gd of g.guards) if (g.visible[Math.floor(gd.y)][Math.floor(gd.x)] > 0) drawGuard(gd, now);
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+    if (!g.seen[r][c]) continue;
+    const v = g.visible[r][c];
+    ctx.fillStyle = v ? `rgba(0,0,0,${(1 - v) * MOOD.litDark})` : `rgba(1,4,5,${g.light ? MOOD.memDark : MOOD.memDarkOff})`;
+    ctx.fillRect(c * T, r * T, T, T);
+  }
+  ctx.fillStyle = 'rgba(79,209,197,.9)'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillText('입구', sx, sy - 16);
+  // 어둠 속 눈: 빛이 닿지 않는 수호자라도 가까이서 벽에 가리지 않으면 붉은 눈만 보인다 (가끔 깜빡임). 아주 가까우면 실루엣까지
+  for (const gd of g.guards) {
+    if (g.visible[Math.floor(gd.y)][Math.floor(gd.x)] > 0 || gd.state === 'dormant' || gd.state === 'stunned') continue;
+    const d = Math.hypot(gd.x - g.player.x, gd.y - g.player.y);
+    if (d <= CONFIG.guard.nearRange) { ctx.globalAlpha = 0.35 + 0.45 * (1 - d / CONFIG.guard.nearRange); drawGuard(gd, now); ctx.globalAlpha = 1; }   // 갑자기 튀어나와 죽이는 느낌이 없게, 가까우면 보인다
+    // 쫓아올 때는 벽 너머라도, 깜빡임 없이, 더 크게 — 어둠 속에서 눈이 다가오는 게 보여야 한다
+    const chasing = gd.state === 'investigate' || gd.state === 'alert';
+    if (chasing ? d > Fl.eyeRange * 1.6 : (d > Fl.eyeRange || !hasLOS(g, g.player.x, g.player.y, gd.x, gd.y) || Math.floor(now * 2 + gd.x) % 6 === 0)) continue;
+    const ex = Math.round(gd.x * T), ey = Math.round(gd.y * T) - 8 * TP, s = chasing ? 4 : 3;
+    if (chasing) { const eg = ctx.createRadialGradient(ex, ey, 1, ex, ey, 14); eg.addColorStop(0, 'rgba(255,40,40,.35)'); eg.addColorStop(1, 'rgba(255,40,40,0)'); ctx.fillStyle = eg; ctx.fillRect(ex - 14, ey - 14, 28, 28); }
+    ctx.fillStyle = chasing ? '#ff1a1a' : '#ff2a2a'; ctx.fillRect(ex - 3 - s, ey, s, s); ctx.fillRect(ex + 3, ey, s, s);
+    if (!g.hinted.eyes && g.state === 'play') { g.hinted.eyes = true; toast('어둠 속에서 눈이 빛난다… 횃불을 끄고 조용히 비켜서면 지나간다', 'bad', 3400); }
+  }
+  // 기름병: 어둠 속에서도 불씨처럼 보인다 (빛 없이 찾을 수 있는 유일한 것)
+  for (const o of g.oils) {
+    if (o.taken) continue;
+    const d = Math.hypot(o.c + 0.5 - g.player.x, o.r + 0.5 - g.player.y);
+    if (d > Fl.eyeRange || !hasLOS(g, g.player.x, g.player.y, o.c + 0.5, o.r + 0.5)) continue;
+    const ox = o.c * T + T / 2, oy = o.r * T + T / 2, f = 0.55 + 0.45 * Math.sin(now * 6 + o.c * 1.3);
+    const gr = ctx.createRadialGradient(ox, oy, 1, ox, oy, 10); gr.addColorStop(0, `rgba(255,154,60,${0.35 * f})`); gr.addColorStop(1, 'rgba(255,154,60,0)');
+    ctx.fillStyle = gr; ctx.fillRect(ox - 10, oy - 10, 20, 20);
+    ctx.fillStyle = '#7a5a2e'; ctx.fillRect(Math.round(ox - 3), Math.round(oy - 2), 6, 7);          // 병
+    ctx.fillStyle = f > 0.8 ? '#ffe9b0' : '#ff9a3c'; ctx.fillRect(Math.round(ox - 1), Math.round(oy - 5), 2, 3);   // 불씨
+  }
+  // 손전등: 렌즈에서 나가는 따뜻한 부채꼴 빛 + 몸 주변 작은 원
+  const px = g.player.x * T, py = g.player.y * T, pr = T * CONFIG.playerRadius;
+  const aim = (g.player.aim !== undefined ? g.player.aim : g.player.dir);
+  const lp0 = lanternPos(px, py, pr, aim), bx = lp0.x, by = lp0.y;   // 빛은 랜턴에서 시작
+  {   // 빛을 저해상도 캔버스에 단계(밴드)로 그린 뒤 확대 → 가장자리와 밝기 변화가 도트처럼 계단져 보임
+    const M = ctx.getTransform(), lw = Math.ceil(cv.width / TP), lh = Math.ceil(cv.height / TP);
+    if (!LIGHT.cv || LIGHT.cv.width !== lw || LIGHT.cv.height !== lh) { LIGHT.cv = document.createElement('canvas'); LIGHT.cv.width = lw; LIGHT.cv.height = lh; LIGHT.c = LIGHT.cv.getContext('2d'); }
+    const lc = LIGHT.c; lc.setTransform(1, 0, 0, 1, 0, 0); lc.clearRect(0, 0, lw, lh); lc.setTransform(M.a / TP, M.b / TP, M.c / TP, M.d / TP, M.e / TP, M.f / TP);
+    const flick = 1 + MOOD.flicker * (Math.sin(now * 9.3) + 0.6 * Math.sin(now * 14.1 + 1.7)) / 1.6;
+    if (g.light) {   // 횃불: 사방으로 퍼지는 따뜻한 빛, 가장자리는 단계로
+      lc.fillStyle = `rgba(${MOOD.lantern},.10)`;
+      for (const k of [1, 0.82, 0.64, 0.46, 0.28]) { lc.beginPath(); lc.arc(px, py, Fl.radius * T * k * Math.max(0.92, Math.min(1.08, flick)), 0, 7); lc.fill(); }
+    } else if (g.lighting > 0) {   // 켜는 중: 불씨가 커진다
+      const k = 1 - g.lighting / CONFIG.torch.lightDelay;
+      lc.fillStyle = `rgba(${MOOD.lantern},${.06 + .1 * k})`; lc.beginPath(); lc.arc(px, py, (0.4 + 1.2 * k) * T, 0, 7); lc.fill();
+    }
+    lc.fillStyle = `rgba(${MOOD.ambient},${g.light ? .05 : .03})`;
+    for (const k of [1, 0.6]) { lc.beginPath(); lc.arc(px, py, Fl.offAmbient * T * k, 0, 7); lc.fill(); }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false; ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(LIGHT.cv, 0, 0, lw * TP, lh * TP); ctx.restore();
+  }
+  drawPlayer(g, now, aim);
+  for (const pt of particles) { ctx.fillStyle = `rgba(${pt.color},${Math.max(0, pt.life / pt.max)})`; ctx.fillRect(pt.x * T - pt.size / 2, pt.y * T - pt.size / 2, pt.size, pt.size); }
+  // 마우스: 조준점, 줍기 가능 표시, 던지기 낙하 지점
+  if (screen === 'play' && mouse.inside && g.state === 'play') {
+    const mx = mouse.x * T, my = mouse.y * T;
+    let hover = null;
+    for (const rl of g.relics) if (!rl.taken && rl.seen && Math.hypot(rl.c + 0.5 - mouse.x, rl.r + 0.5 - mouse.y) <= 0.75) hover = rl;
+    const nearEnough = hover && Math.hypot(hover.c + 0.5 - g.player.x, hover.r + 0.5 - g.player.y) <= CONFIG.mouseRange;
+    cv.style.cursor = hover ? (nearEnough ? 'pointer' : 'not-allowed') : 'crosshair';
+    if (hover) { ctx.strokeStyle = nearEnough ? '#ffe9b0' : 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(hover.c * T + T / 2, hover.r * T + T / 2, 13, 0, 7); ctx.stroke(); }
+    if (g.carried.length) {
+      const land = throwLanding(g, mouse.x, mouse.y);
+      if (land) { ctx.strokeStyle = 'rgba(242,193,78,.6)'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(land.x * T, land.y * T, 9, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    }
+    ctx.save(); ctx.translate(mx, my); ctx.scale(0.7, 0.7);
+    ctx.strokeStyle = 'rgba(210,245,235,.75)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(0, 0, 6, 0, 7); ctx.moveTo(-11, 0); ctx.lineTo(-3, 0); ctx.moveTo(3, 0); ctx.lineTo(11, 0); ctx.moveTo(0, -11); ctx.lineTo(0, -3); ctx.moveTo(0, 3); ctx.lineTo(0, 11); ctx.stroke();
+    ctx.restore();
+  } else cv.style.cursor = 'default';
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (screen === 'play') drawMotes(now);
+  const vg = ctx.createRadialGradient(cv.width / 2, cv.height / 2, cv.height * 0.34, cv.width / 2, cv.height / 2, cv.width * 0.62);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.62)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, cv.width, cv.height);
+  // 수호자가 가까우면 화면 가장자리가 심장 박동처럼 붉게 뛴다 (벽 너머라도) — 보이기 전에 느껴지게
+  if (screen === 'play' && g.state === 'play') {
+    let nd = Infinity; for (const gd of g.guards) if (gd.state !== 'dormant' && gd.state !== 'stunned') nd = Math.min(nd, Math.hypot(gd.x - g.player.x, gd.y - g.player.y));
+    if (nd <= CONFIG.guard.dreadRange) {
+      const k = 1 - nd / CONFIG.guard.dreadRange, beat = Math.pow(Math.max(0, Math.sin(now * (2 + 2.5 * k))), 6);
+      const dv = ctx.createRadialGradient(cv.width / 2, cv.height / 2, cv.height * 0.25, cv.width / 2, cv.height / 2, cv.width * 0.6);
+      dv.addColorStop(0, 'rgba(255,30,30,0)'); dv.addColorStop(1, `rgba(255,30,30,${(0.12 + 0.3 * k) * (0.4 + 0.6 * beat)})`);
+      ctx.fillStyle = dv; ctx.fillRect(0, 0, cv.width, cv.height);
+      // 색에 의존하지 않는 신호: 수호자가 있는 방향의 화면 가장자리에 흰 삼각형이 박동에 맞춰 나타난다
+      let gx = 0, gy = 0, bd = Infinity; for (const gd of g.guards) { const d = Math.hypot(gd.x - g.player.x, gd.y - g.player.y); if (gd.state !== 'dormant' && gd.state !== 'stunned' && d < bd) { bd = d; gx = gd.x - g.player.x; gy = gd.y - g.player.y; } }
+      const ang = Math.atan2(gy, gx), R = Math.min(cv.width, cv.height) * 0.44;
+      ctx.save(); ctx.translate(cv.width / 2 + Math.cos(ang) * R, cv.height / 2 + Math.sin(ang) * R); ctx.rotate(ang);
+      ctx.globalAlpha = 0.25 + 0.6 * beat; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+  }
+  if (flash.a > 0) { ctx.fillStyle = `rgba(${flash.color},${flash.a})`; ctx.fillRect(0, 0, cv.width, cv.height); }
+}
+
+let last = performance.now();
+function loop(ts) {
+  const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+  if (screen === 'play' && game && !codexOpen) {
+    let dx = 0, dy = 0;
+    if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
+    if (keys.has('d') || keys.has('arrowright')) dx += 1;
+    if (keys.has('w') || keys.has('arrowup')) dy -= 1;
+    if (keys.has('s') || keys.has('arrowdown')) dy += 1;
+    syncMouse();
+    const aim = mouse.inside ? Math.atan2(mouse.y - game.player.y, mouse.x - game.player.x) : game.player.dir;
+    updateGame(game, dt, { dx, dy, aim });
+    for (const gd of game.guards) {
+      if ((gd.state === 'patrol' || gd.state === 'investigate' || gd.state === 'alert') && gd.moving) {
+        gd.stepT = (gd.stepT || 0) - dt;
+        if (gd.stepT <= 0) {
+          const d = Math.hypot(gd.x - game.player.x, gd.y - game.player.y), H = CONFIG.guard.hearRadius;
+          if (d <= H) Audio_.step(Math.pow(1 - d / H, 1.2));
+          gd.stepT = gd.state === 'investigate' ? 0.32 : 0.5;
+        }
+      }
+    }
+    // 심장 소리: 가까울수록 빠르게
+    { let nd = Infinity; for (const gd of game.guards) if (gd.state !== 'dormant' && gd.state !== 'stunned') nd = Math.min(nd, Math.hypot(gd.x - game.player.x, gd.y - game.player.y));
+      if (nd <= CONFIG.guard.dreadRange && game.state === 'play') { const k = 1 - nd / CONFIG.guard.dreadRange; heartT -= dt; if (heartT <= 0) { Audio_.heart(0.4 + 0.6 * k); heartT = 0.9 - 0.5 * k; } } }
+    const col = game.collapse;
+    if (col.active && game.state === 'play') {
+      const k = 1 - col.remaining / (game ? game.cfg : CONFIG).collapse.startTime;           // 0 → 1 로 진행
+      shake = Math.max(shake, 0.04 + 0.22 * k * k);
+      if (Math.random() < dt * (1 + 6 * k)) dustBurst(1 + Math.floor(3 * k));
+      rumbleTimer -= dt;
+      if (rumbleTimer <= 0) { Audio_.rumble(0.3 + 0.7 * k); rumbleTimer = 9 - 4 * k; }
+    }
+    handleFx();
+    updateHUD();
+  }
+  for (const pt of particles) { pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vx *= 0.92; pt.vy *= 0.92; pt.life -= dt; }
+  particles = particles.filter(p => p.life > 0);
+  flash.a = Math.max(0, flash.a - dt * 1.6); shake = Math.max(0, shake - dt);
+  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').className = ''; }
+  updateTip();
+  render(ts / 1000);
+  requestAnimationFrame(loop);
+}
+
+function setSound(on) { Audio_.on = on; $('soundBtn').textContent = $('soundBtnT').textContent = on ? '🔊 소리 켬' : '🔇 소리 끔'; }
+
+function codexHTML() {
+  const cat = relicCatalog();
+  const card = rl => {
+    const got = PROFILE.got[rl.id], found = PROFILE.found[rl.id], gr = CONFIG.grades[rl.grade];
+    if (!found) return `<div class="cx-card unknown"><div class="ico">${relicIcon(rl)}</div><div><div class="nm">???</div><div class="sub">아직 발견하지 못함</div></div></div>`;
+    return `<div class="cx-card ${rl.grade} ${got ? 'got' : 'found'}"><div class="ico">${relicIcon(rl)}</div><div><div class="nm">${rl.name}${gradeMarks(rl)}</div>` +
+      `<div class="sub">${gr.name} · ${rl.value}점${rl.protect ? ' · 방어 1회' : ''} · ${got ? '확보 ' + got + '회' : '발견 · 아직 가져오지 못함'}</div>` +
+      (got ? `<div class="lore">${rl.lore}</div>` : `<div class="lore" style="color:var(--dim)">탈출하며 들고 나오면 기록이 열립니다</div>`) + `</div></div>`;
+  };
+  let h = cat.map(r => `<div class="cx-round"><b>라운드 ${r.round}</b>${roundUnlocked(PROFILE, r.round) ? '' : ' · 🔒 라운드 ' + (r.round - 1) + ' 탈출 시 열림'}</div><div class="cx-row">${r.relics.map(card).join('')}</div>`).join('');
+  h += `<div class="cx-round"><b>라운드 3 이후</b> · 구성 미정 (추가 예정)</div><div class="cx-row">${'<div class="cx-card locked"><div class="ico"></div><div><div class="nm">???</div><div class="sub">준비 중</div></div></div>'.repeat(3)}</div>`;
+  return h;
+}
+function openCodex() {
+  const tot = relicCatalog().reduce((n, r) => n + r.relics.length, 0);
+  $('codexSum').textContent = `확보 ${Object.keys(PROFILE.got).length}/${tot} · 발견 ${Object.keys(PROFILE.found).length}/${tot} (이 브라우저에 저장됨)`;
+  $('codexBody').innerHTML = codexHTML();
+  $('codexScreen').classList.remove('hidden'); codexOpen = true;
+}
+function closeCodex() { $('codexScreen').classList.add('hidden'); codexOpen = false; keys.clear(); }
+// 메인 메뉴: 시작 화면으로. 플레이 중이면 한 번 더 눌러야 포기(실수 방지)
+let homeArmT = null;
+function goHome(fromHud) {
+  const playing = screen === 'play' && game && game.state === 'play';
+  if (playing && fromHud) {
+    const b = $('homeBtn');
+    if (homeArmT === null) { b.classList.add('arm'); b.textContent = '한 번 더: 포기하고 메인 메뉴'; homeArmT = setTimeout(() => { homeArmT = null; b.classList.remove('arm'); b.textContent = '🏠 메인 메뉴'; }, 2500); return; }
+    clearTimeout(homeArmT); homeArmT = null; b.classList.remove('arm'); b.textContent = '🏠 메인 메뉴';
+  }
+  if (playing) {
+    const run = SESSION.runs[SESSION.runs.length - 1];
+    if (run && !run.result) { run.result = { round: game.round, outcome: '중도 포기', score: 0, time: fmtTime(game.time), kept: [], lost: [] }; game.log.push({ t:+game.time.toFixed(2), time:fmtTime(game.time), type:'quit', msg:'메인 메뉴로 나가 판을 포기', level:game.level, carried:game.carried.map(r => r.name) }); }
+    applyRunToProfile(PROFILE, game); saveProfile();
+  }
+  keys.clear(); closeCodex();
+  screen = 'start'; $('app').classList.add('title'); $('resultScreen').classList.add('hidden'); $('startScreen').classList.remove('hidden');
+  refreshStart(); updateHUD();
+}
+function refreshStart() {
+  const un2 = roundUnlocked(PROFILE, 2), b2 = $('startBtn2');
+  b2.disabled = !un2; b2.textContent = un2 ? '라운드 2 시작' : '🔒 라운드 2';
+  { const list = Object.values(roundCfg(1).relics).sort((a, b) => a.value - b.value);
+    $('relicGuide').innerHTML = list.map((rl, i) => `<div><b>[${i + 1}] ${rl.name}</b> +${rl.value} · ${relicUse(rl, list)}</div>`).join('') +
+      `<div class="rg">발소리: 움직일 때만 나고, 유물을 많이 들수록 멀리 들려요. 멈추면 조용해요. · 던지기: 우클릭(가장 값싼 유물) 또는 1·2·3 키</div>`; }
+  $('goalLine').innerHTML = `라운드 1 — ${CONFIG.goalText.replace(/^목표 /, '목표 ')}<br><span style="color:${un2 ? 'var(--gold)' : 'var(--dim)'}">${un2 ? '라운드 2 — ' + CONFIG.rounds[2].goalText : '라운드 2는 라운드 1에서 유물을 들고 탈출하면 열립니다'}</span>`;
+  const tot = relicCatalog().reduce((n, r) => n + r.relics.length, 0);
+  const prog = `${Object.keys(PROFILE.got).length}/${tot}`;
+  $('codexBtn').textContent = `📖 유물 도감 (확보 ${prog})`; $('codexBtn2').textContent = `📖 유물 도감 (확보 ${prog})`; $('codexBtnHud').textContent = `📖 도감 ${prog}`;
+}
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (codexOpen) { if (k === 'escape' || k === 'enter') closeCodex(); return; }
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) e.preventDefault();
+  if (k === 'm' && !e.repeat) { setSound(!Audio_.on); return; }
+  if (screen === 'start' && k === 'enter') { Audio_.init(); newRun(1); return; }
+  if (screen === 'result' && k === 'r') { newRun(); return; }
+  if (screen === 'result' && k === 'h') { goHome(false); return; }
+  if (screen === 'play' && k === 'e' && !e.repeat) { interact(game); return; }
+  if (screen === 'play' && game && k === 'f' && !e.repeat) { toggleLight(game); return; }
+  if (screen === 'play' && game && !e.repeat && (k === '1' || k === '2' || k === '3')) {
+    const r = throwSlot(game, +k, mouse.inside ? mouse.x : null, mouse.inside ? mouse.y : null);
+    if (r.result === 'confirm') toast(`${r.relic.name}은(는) 방어를 잃어요 — ${game.cfg.throwConfirm}초 안에 [${k}]를 한 번 더 누르면 던집니다`, 'warn', 1800);
+    else if (r.result === 'none') toast(r.relic ? `[${k}] ${r.relic.name}: 지금 들고 있지 않아요` : `[${k}] 해당하는 유물 칸이 없어요`, '', 1100);
+    else if (r.result === 'blocked') toast('그 방향으로는 던질 수 없어요', '', 1100);
+    return;
+  }
+  keys.add(k);
+});
+window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => keys.clear());
+refreshStart();
+function canvasPoint(e) {
+  const r = cv.getBoundingClientRect();
+  mouse.sx = (e.clientX - r.left) / r.width * cv.width; mouse.sy = (e.clientY - r.top) / r.height * cv.height; mouse.inside = true;
+  syncMouse();
+}
+cv.addEventListener('mousemove', canvasPoint);
+cv.addEventListener('mouseleave', () => { mouse.inside = false; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('mousedown', e => {
+  if (screen !== 'play' || !game) return;
+  e.preventDefault(); Audio_.init(); canvasPoint(e);
+  if (e.button === 0) {   // 좌클릭: 유물·입구를 찍으면 줍기/탈출, 횃불은 F 키로만
+    const res = clickAt(game, mouse.x, mouse.y);
+    if (res === 'far') toast('너무 멀어요 — 더 가까이 가세요', '', 1200);
+  }
+  else if (e.button === 2) throwRelic(game, mouse.x, mouse.y);
+});
+fillIcons();
+$('startBtn').onclick = () => { Audio_.init(); newRun(1); };
+$('startBtn2').onclick = () => { Audio_.init(); newRun(2); };
+$('restartBtn').onclick = () => newRun();
+$('nextBtn').onclick = e => newRun(+e.currentTarget.dataset.round);
+$('codexBtn').onclick = openCodex; $('codexBtn2').onclick = openCodex; $('codexClose').onclick = closeCodex;
+$('codexBtnHud').onclick = e => { openCodex(); e.currentTarget.blur(); };
+$('homeBtn').onclick = e => { goHome(true); e.currentTarget.blur(); };
+$('homeBtn2').onclick = () => goHome(false);
+$('soundBtnT').onclick = e => { Audio_.init(); setSound(!Audio_.on); e.currentTarget.blur(); };
+$('soundBtn').onclick = e => { Audio_.init(); setSound(!Audio_.on); e.currentTarget.blur(); };
+$('copyBtn').onclick = async () => {
+  const txt = sessionText();
+  try { await navigator.clipboard.writeText(txt); $('copyMsg').textContent = '복사됨'; }
+  catch (e) { $('logBox').textContent = txt; $('copyMsg').textContent = '자동 복사가 막혀 위 칸에 전체 로그를 표시했습니다. 직접 선택해 복사하세요.'; }
+};
+window.SESSION = SESSION;
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

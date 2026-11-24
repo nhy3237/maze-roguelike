@@ -1,0 +1,1 @@
+{ "name": "RingingLoot.Editor", "references": ["RingingLoot.View"], "includePlatforms": ["Editor"] }

@@ -1,0 +1,1 @@
+{ "name": "RingingLoot.View", "references": ["RingingLoot.Core", "Unity.InputSystem"] }
